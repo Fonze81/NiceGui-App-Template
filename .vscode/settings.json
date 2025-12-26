@@ -1,0 +1,63 @@
+{
+  // Fonte e editor
+  "editor.fontFamily": "Fira Code",
+  "editor.fontLigatures": true,
+
+  "editor.tabSize": 4,
+  "editor.insertSpaces": true,
+
+  "editor.renderWhitespace": "boundary",
+  "editor.renderControlCharacters": false,
+
+  // Salvamento e ações automáticas
+  "editor.formatOnSave": true,
+
+  "editor.codeActionsOnSave": {
+    "source.fixAll": true,
+    "source.organizeImports": true
+  },
+
+  // Python
+  "python.analysis.typeCheckingMode": "basic",
+  "python.analysis.autoSearchPaths": true,
+  "python.analysis.useLibraryCodeForTypes": true,
+
+  // Ajuste automático do interpretador se houver venv local
+  "python.defaultInterpreterPath": ".venv/Scripts/python.exe",
+
+  // Ruff (lint + fix + imports)
+  "ruff.enable": true,
+  "ruff.fixAll": true,
+  "ruff.organizeImports": true,
+
+  // Evita conflito: Ruff é o formatador do Python
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff"
+  },
+
+  // Prettier (apenas para não-Python)
+  "[json]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[markdown]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+
+  // Arquivos e limpeza
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+  "files.eol": "\n",
+
+  // TODO Tree
+  "todo-tree.general.tags": [
+    "TODO",
+    "FIXME",
+    "BUG",
+    "HACK",
+    "NOTE"
+  ],
+
+  // Git
+  "git.autofetch": true,
+  "git.enableSmartCommit": true
+}

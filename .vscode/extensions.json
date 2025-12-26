@@ -1,0 +1,19 @@
+{
+  "recommendations": [
+    "alefragnani.bookmarks",
+    "dracula-theme.theme-dracula",
+    "seyyedkhandon.firacode",
+    "mhutchie.git-graph",
+    "ms-python.python",
+    "gruntfuggly.todo-tree",
+    "shardulm94.trailing-spaces",
+    "ms-python.debugpy",
+    "esbenp.prettier-vscode",
+    "charliermarsh.ruff",
+    "editorconfig.editorconfig",
+    "littlefoxteam.vscode-python-test-adapter",
+    "christian-kohler.path-intellisense",
+    "yzhang.markdown-all-in-one",
+    "pkief.material-icon-theme"
+  ]
+}
