@@ -4,8 +4,8 @@ Este repositório é um **template inicial** para criar aplicações **desktop o
 utilizando **NiceGUI** com Python, **com foco exclusivo no Windows**.
 
 O objetivo é facilitar o início de novos projetos, oferecendo uma base organizada,
-padronizada e fácil de entender, preparada principalmente para **aplicações nativas
-no Windows**.
+padronizada e fácil de entender, preparada principalmente para **aplicações
+desktop nativas no Windows**.
 
 ---
 
@@ -66,13 +66,11 @@ Durante a instalação:
 - Marque a opção **“Add Python to PATH”**
 - Utilize as opções padrão do instalador
 
-Após a instalação, verifique no **Prompt de Comando** ou **PowerShell**:
+Após a instalação, verifique no **PowerShell**:
 
 ```powershell
 python --version
 ```
-
-````
 
 O resultado esperado é algo como:
 
@@ -86,15 +84,10 @@ Python 3.13.x
 
 É altamente recomendado criar um **ambiente virtual Python** para este projeto.
 
-Isso permite:
+### Usando explicitamente o Python 3.13
 
-- Isolar dependências do projeto
-- Evitar conflitos com outros projetos Python
-- Garantir que o ambiente funcione corretamente no Windows
-
-### Criando a VENV
-
-Na pasta raiz do projeto, execute:
+Em sistemas Windows, é comum ter mais de uma versão do Python instalada.
+Para garantir que a VENV seja criada **com Python 3.13**, utilize o Python Launcher:
 
 ```powershell
 py -3.13 -m venv .venv
@@ -104,85 +97,107 @@ py -3.13 -m venv .venv
 
 ## ⚠️ PowerShell: Política de Execução (Importante)
 
-Ao tentar ativar a VENV no Windows, **usuários iniciantes frequentemente encontram um erro**
-relacionado à **política de execução do PowerShell**.
+Ao ativar a VENV pela primeira vez, pode aparecer um erro informando que
+a execução de scripts está bloqueada.
 
-### Erro comum
+Isso é uma configuração de segurança padrão do Windows.
 
-Ao executar:
+### Como resolver
 
-```powershell
-.venv\Scripts\Activate.ps1
-```
-
-Pode aparecer uma mensagem semelhante a:
-
-> _"A execução de scripts foi desabilitada neste sistema."_
-
-Isso **não é um erro do Python nem do projeto**.
-É uma configuração de segurança padrão do Windows.
-
----
-
-### Como resolver (recomendado)
-
-Abra o **PowerShell como usuário normal** (não precisa ser administrador) e execute:
+No PowerShell (usuário normal), execute:
 
 ```powershell
 Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
 ```
 
-Quando solicitado, confirme com **Y**.
+Confirme com **Y** quando solicitado.
 
-✅ Essa configuração:
+Essa configuração:
 
-- Afeta **somente o usuário atual**
-- Permite executar scripts locais (como a VENV)
-- Mantém a segurança do sistema
+- Afeta apenas o usuário atual
+- É necessária apenas uma vez
+- Não compromete a segurança do sistema
 
 ---
 
-### Ativando a VENV após o ajuste
-
-Depois disso, ative normalmente:
+## ▶️ Ativando a VENV (Windows)
 
 ```powershell
 .venv\Scripts\Activate.ps1
 ```
 
-O terminal indicará que o ambiente virtual está ativo.
+Após a ativação, verifique:
+
+```powershell
+python --version
+```
+
+Resultado esperado:
+
+```text
+Python 3.13.x
+```
 
 ---
 
-## 🧠 Observação importante
+## 📦 Instalação dos Pacotes Python
 
-Essa configuração é necessária **apenas uma vez por usuário**.
-Após ajustada, você não precisará repetir esse passo em outros projetos Python.
+Todas as dependências do projeto estão listadas no arquivo:
 
----
+```
+requirements.txt
+```
 
-### Integração com o VS Code
+Com a VENV ativa, instale os pacotes executando:
 
-O VS Code está configurado para:
-
-- Detectar automaticamente a pasta `.venv`
-- Utilizar o interpretador correto
-- Aplicar lint, formatação e organização de código automaticamente
-
-Caso o VS Code solicite a seleção do interpretador Python,
-escolha o Python localizado dentro da pasta `.venv`.
+```powershell
+pip install -r requirements.txt
+```
 
 ---
 
-## 📌 Próximos conteúdos (em evolução)
+## 📦 Sobre os pacotes instalados
+
+Este template utiliza os seguintes pacotes principais:
+
+- **nicegui**
+  Framework principal da interface gráfica.
+
+- **pywebview**
+  Permite executar a aplicação como um **aplicativo desktop nativo no Windows**.
+
+- **pythonnet**
+  Necessário para integração com componentes nativos do Windows.
+
+- **pytest**
+  Ferramenta para testes automatizados.
+
+- **ruff**
+  Ferramenta para análise e correção automática do código.
+
+- **pyinstaller**
+  Utilizado **somente** para gerar o executável (`.exe`).
+  Não é necessário para rodar o projeto durante o desenvolvimento.
+
+---
+
+## 📌 Observação importante
+
+- ❌ Não execute o `pyinstaller` agora
+- ✅ Primeiro, execute e entenda o projeto
+- ✅ O empacotamento será tratado em uma etapa futura
+
+---
+
+## 🔜 Próximos conteúdos (em evolução)
 
 Este template será expandido gradualmente para incluir:
 
-- Como executar o projeto no Windows
+- Como executar o projeto pela primeira vez
 - Estrutura de pastas
 - Conceitos básicos de SPA com NiceGUI
 - Exemplos práticos de uso
-- Uso como aplicação desktop nativa no Windows
+- Geração de aplicativo desktop (`.exe`) no Windows
 
 ---
 
@@ -190,4 +205,3 @@ Este template será expandido gradualmente para incluir:
 
 Projeto pessoal de **Afonso Gilmar Krüger**.
 Uso livre para fins de estudo e projetos pessoais.
-````
