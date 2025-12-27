@@ -59,5 +59,13 @@
 
   // Git
   "git.autofetch": true,
-  "git.enableSmartCommit": true
+  "git.enableSmartCommit": true,
+
+  // Test
+  "python.testing.pytestEnabled": true,
+  "python.testing.unittestEnabled": false,
+  "python.testing.pytestArgs": [
+    "tests"
+  ],
+  "python.testing.autoTestDiscoverOnSaveEnabled": true
 }
