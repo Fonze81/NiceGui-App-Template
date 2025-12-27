@@ -1,0 +1,13 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug NiceGUI (src layout)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "nicegui_app_template",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    }
+  ]
+}

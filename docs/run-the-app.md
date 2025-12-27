@@ -1,8 +1,12 @@
 # Run the App (Windows)
 
-Este documento mostra como executar o **NiceGui-App-Template** no Windows pela primeira vez.
+Este documento explica **como executar o NiceGui-App-Template no Windows**
+utilizando o **src layout**.
 
-O objetivo é ser direto e funcionar mesmo para iniciantes.
+> ⚠️ Importante
+> Quando um projeto usa `src/`, o pacote **precisa ser instalado no ambiente**
+> para que o Python consiga encontrá-lo.
+> Por isso, o uso de **instalação editável (`pip install -e .`) é obrigatório**.
 
 ---
 
@@ -10,71 +14,34 @@ O objetivo é ser direto e funcionar mesmo para iniciantes.
 
 Antes de continuar, confirme:
 
-- Você está no **Windows**
-- Você instalou o **Python 3.13**
-- Você abriu o projeto no **VS Code** (recomendado)
+- Windows
+- Python **3.13**
+- Ambiente virtual (`.venv`) ativo
+- Terminal aberto **na raiz do projeto**
 
-Se quiser conferir a versão do Python:
+---
+
+## 1️⃣ Ativar o ambiente virtual
+
+```powershell
+.venv\Scripts\Activate.ps1
+```
+
+Confirme:
 
 ```powershell
 python --version
 ```
 
-O resultado esperado é:
+Esperado:
 
-```powershell
+```text
 Python 3.13.x
 ```
 
 ---
 
-## 1) Abrir um terminal no diretório do projeto
-
-No VS Code:
-
-- Menu **Terminal** → **New Terminal**
-
-Ou no Windows:
-
-- Abra o PowerShell e navegue até a pasta do projeto
-
----
-
-## 2) Criar a VENV (somente na primeira vez)
-
-Para garantir que a VENV será criada com o Python 3.13, use:
-
-```powershell
-py -3.13 -m venv .venv
-```
-
----
-
-## 3) Ativar a VENV
-
-```powershell
-.venv\Scripts\Activate.ps1
-```
-
-### Se aparecer erro de Execution Policy
-
-Se você receber um erro dizendo que a execução de scripts está bloqueada, execute:
-
-```powershell
-Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
-```
-
-Confirme com **Y** e tente ativar novamente:
-
-```powershell
-.venv\Scripts\Activate.ps1
-```
-
----
-
-## 4) Instalar as dependências
-
-Com a VENV ativa, instale os pacotes:
+## 2️⃣ Instalar as dependências
 
 ```powershell
 pip install -r requirements.txt
@@ -82,60 +49,114 @@ pip install -r requirements.txt
 
 ---
 
-## 5) Executar o aplicativo
+## 3️⃣ Instalar o projeto em modo editável (obrigatório)
 
-> Ajuste o comando abaixo caso o ponto de entrada do projeto seja diferente no seu template.
+Este passo é essencial para projetos com `src/` layout.
 
-### Opção A (recomendada): executar como módulo
+```powershell
+pip install -e .
+```
+
+📌 O ponto (`.`) indica a pasta atual (raiz do projeto).
+
+Após esse comando:
+
+- o pacote `nicegui_app_template` fica disponível no Python
+- `python -m nicegui_app_template` passa a funcionar
+- pytest encontra os módulos corretamente
+- debug no VS Code funciona sem ajustes extras
+
+---
+
+## 4️⃣ Executar o aplicativo
+
+Execute sempre **como módulo**, nunca chamando arquivos dentro de `src/`.
 
 ```powershell
 python -m nicegui_app_template
 ```
 
-### Opção B: executar o arquivo diretamente
+Se tudo estiver correto, o terminal exibirá algo como:
+
+```text
+Running on http://localhost:8080
+```
+
+Abra o endereço no navegador.
+
+---
+
+## 🚫 O que **não** fazer (com src layout)
+
+❌ Não execute:
 
 ```powershell
 python src\nicegui_app_template\app.py
 ```
 
----
+Isso **não funciona** em projetos com `src/` layout e causa erros como:
 
-## 6) Abrir no navegador
-
-Ao rodar, o terminal mostrará um endereço local, normalmente:
-
-- `http://localhost:8080`
-
-Abra esse endereço no seu navegador.
+- `ModuleNotFoundError`
+- imports quebrados
+- comportamento inconsistente
 
 ---
 
-## ✅ Verificação rápida
+## 5️⃣ Executar os testes
 
-Se tudo estiver correto, você deve ver:
-
-- A página inicial do template
-- Navegação funcionando (SPA)
-- Layout com menu/topo/rodapé (se já estiver implementado)
-
----
-
-## 🛠️ Problemas comuns
-
-### "python não é reconhecido"
-
-- Reinstale o Python 3.13 marcando **Add Python to PATH**
-- Feche e reabra o terminal após instalar
-
-### VENV ativa, mas Python não é 3.13
-
-- Remova a `.venv` e recrie garantindo o comando:
+Com o projeto instalado em modo editável:
 
 ```powershell
-py -3.13 -m venv .venv
+pytest
 ```
 
-### Porta ocupada
+Os testes devem ser encontrados automaticamente.
 
-Se a porta padrão estiver ocupada, pare o app e ajuste a porta no `settings.py`
-(se o template expõe essa configuração).
+---
+
+## 🐞 Debug no VS Code
+
+Para debugar, use uma configuração que execute o **módulo**, não o arquivo.
+
+Exemplo de `launch.json`:
+
+```json
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug NiceGUI (src layout)",
+      "type": "python",
+      "request": "launch",
+      "module": "nicegui_app_template",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    }
+  ]
+}
+```
+
+Depois:
+
+1. Abra **Run and Debug** no VS Code
+2. Selecione **Debug NiceGUI (src layout)**
+3. Pressione **F5**
+
+---
+
+## 🧠 Resumo rápido
+
+Em projetos com `src/` layout, o fluxo correto é sempre:
+
+```text
+pip install -e .
+python -m nicegui_app_template
+pytest
+```
+
+Esse padrão evita:
+
+- problemas de import
+- ajustes manuais de PYTHONPATH
+- falhas no debug
+- testes não encontrados
