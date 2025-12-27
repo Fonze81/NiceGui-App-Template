@@ -1,20 +1,18 @@
 # Project Structure
 
-Este documento explica a **estrutura de pastas e arquivos** do projeto
-**NiceGui-App-Template**.
+Este documento descreve a **estrutura atual do repositório**
+**NiceGui-App-Template** e explica o papel de cada pasta e arquivo.
 
-O objetivo desta organização é:
+A estrutura foi pensada para:
 
-- Facilitar o entendimento do projeto
-- Evitar código desorganizado conforme o projeto cresce
-- Separar claramente responsabilidades
-- Ajudar iniciantes a saber **onde colocar cada coisa**
-
-O foco é **Windows** e aplicações **desktop/web com NiceGUI**.
+- funcionar corretamente no Windows
+- suportar `src` layout sem hacks
+- permitir execução, debug e testes de forma consistente
+- crescer de forma controlada
 
 ---
 
-## Visão geral da estrutura
+## Visão geral
 
 ```
 
@@ -24,28 +22,27 @@ NiceGui-App-Template/
 ├─ assets/
 ├─ src/
 ├─ tests/
-├─ README.md
+├─ pyproject.toml
 ├─ requirements.txt
-└─ pyproject.toml
+└─ README.md
 
 ```
-
-Cada pasta tem um propósito bem definido, descrito abaixo.
 
 ---
 
 ## 📁 `.vscode/`
 
-Contém configurações específicas do **Visual Studio Code**.
+Configurações do **Visual Studio Code** para padronizar o ambiente.
 
 - `extensions.json`
-  Lista de extensões recomendadas para o projeto.
+  Extensões recomendadas para o projeto.
 
 - `settings.json`
-  Ajustes do editor (formatação, Ruff, Python, etc.).
+  Ajustes do editor (Python, Ruff, formatação, etc.).
 
-Esses arquivos ajudam a garantir um ambiente de desenvolvimento consistente
-entre diferentes pessoas.
+- `launch.json`
+  Configuração de debug que executa o aplicativo como **módulo**
+  (`python -m nicegui_app_template`).
 
 ---
 
@@ -53,219 +50,174 @@ entre diferentes pessoas.
 
 Documentação do projeto.
 
-Aqui ficam arquivos que explicam **como o projeto funciona**, sem misturar
-documentação com código.
+- `development-environment.md`
+  Como preparar o ambiente de desenvolvimento no Windows.
 
-Arquivos iniciais:
+- `run-the-app.md`
+  Como executar, debugar e testar o aplicativo usando `src` layout.
 
-- `development-environment.md` → ambiente de desenvolvimento
-- `run-the-app.md` → como executar o projeto
-- `project-structure.md` → este documento
+- `project-structure.md`
+  Este documento.
 
 ---
 
 ## 📁 `assets/`
 
-Recursos visuais e estáticos do projeto.
+Arquivos estáticos e recursos visuais.
 
-Esses arquivos **não são código Python**, mas fazem parte da interface.
+- `assets/css/`
+  CSS global e customizações futuras.
 
-### `assets/css/`
+- `assets/icons/`
+  Ícones do aplicativo (ex.: `.ico` para Windows).
 
-- Arquivos de estilo (CSS)
-- Usados para customização visual futura
-
-### `assets/icons/`
-
-- Ícones da aplicação
-- Inclui o ícone principal do app (`.ico`), usado no Windows
-
-### `assets/images/`
-
-- Imagens gerais (logos, banners, screenshots, etc.)
+- `assets/images/`
+  Imagens gerais (logos, screenshots, etc.).
 
 ---
 
 ## 📁 `src/`
 
-Contém **todo o código Python da aplicação**.
+Todo o código Python do projeto fica dentro da pasta `src`.
+Este padrão evita imports acidentais e prepara o projeto para empacotamento.
 
-O código fica dentro de um pacote real (`nicegui_app_template`), o que:
-
-- Evita imports soltos
-- Facilita testes
-- Ajuda no empacotamento futuro
-
----
-
-## 📦 `src/nicegui_app_template/`
+### 📦 `src/nicegui_app_template/`
 
 Pacote principal da aplicação.
 
+```
+
+src/nicegui_app_template/
+├─ **init**.py
+├─ **main**.py
+├─ app.py
+└─ ui/
+├─ **init**.py
+└─ index.py
+
+```
+
+### `__main__.py`
+
+Permite executar o aplicativo como módulo:
+
+```powershell
+python -m nicegui_app_template
+```
+
+Este é o **modo correto** de execução em projetos com `src` layout.
+
+---
+
 ### `app.py`
 
-Ponto de entrada do aplicativo.
+Ponto de entrada lógico do aplicativo.
 
-Responsável por:
+Responsabilidades atuais:
 
-- Inicializar o NiceGUI
-- Configurar execução (web ou desktop)
-- Chamar a montagem da interface
+- conter a função `main()`
+- chamar a montagem da UI
+- incluir funções simples de exemplo (ex.: `add`) para validação de testes
 
----
-
-### `settings.py`
-
-Arquivo de configurações da aplicação.
-
-Usado para:
-
-- Ajustes gerais
-- Flags de comportamento
-- Centralizar configurações simples
+Neste estágio, o arquivo é mantido propositalmente simples.
 
 ---
 
-## 📁 `core/`
+### `ui/index.py`
 
-Infraestrutura central da aplicação.
+Responsável por montar a interface do usuário.
 
-Aqui ficam elementos que **todo o app pode usar**, mas que não são UI.
+Atualmente contém:
 
-### `state.py`
+- um Hello World básico com NiceGUI
 
-Estado compartilhado da aplicação.
+No futuro, este módulo evolui para:
 
-Usado para:
-
-- Compartilhar dados entre páginas
-- Evitar variáveis globais soltas
-- Manter informações simples (status, flags, mensagens)
-
-Não é um sistema complexo de estado — apenas um ponto central organizado.
-
----
-
-### `logger.py`
-
-Configuração do logger da aplicação.
-
-Usado para:
-
-- Padronizar logs
-- Evitar uso de `print`
-- Facilitar evolução futura (arquivos, níveis, etc.)
-
----
-
-## 📁 `ui/`
-
-Tudo relacionado à **interface do usuário** (NiceGUI).
-
-### `index.py`
-
-Arquivo responsável por montar a interface.
-
-Normalmente:
-
-- Aplica tema e CSS
-- Monta layout global
-- Registra páginas (SPA)
-
----
-
-### 📁 `ui/theme/`
-
-Customização visual da aplicação.
-
-Usado para:
-
-- Aplicar CSS global
-- Registrar ícones e assets
-- Centralizar decisões visuais
-
-Arquivos:
-
-- `custom_css.py` → aplicação de CSS
-- `assets.py` → caminhos e registro de ícones/imagens
-
----
-
-### 📁 `ui/layout/`
-
-Estrutura fixa da interface.
-
-Aqui ficam componentes reutilizáveis como:
-
-- Navbar
-- Drawer (menu lateral)
-- Footer
-
-Esses elementos aparecem em várias páginas.
-
----
-
-### 📁 `ui/pages/`
-
-Conteúdo das páginas da aplicação.
-
-Cada arquivo representa uma página, por exemplo:
-
-- `home.py`
-- `hello.py`
-- `about.py`
-
-Essas páginas são usadas pelo sistema de navegação SPA do NiceGUI.
-
----
-
-## 📁 `services/`
-
-Camada reservada para **integrações e serviços externos**.
-
-Exemplos futuros:
-
-- Banco de dados
-- APIs
-- Integrações com sistemas externos
-
-No início, pode ficar vazia. Ela existe para evitar misturar essas responsabilidades
-com UI ou lógica central.
-
----
-
-## 📁 `utils/`
-
-Funções utilitárias e helpers.
-
-Usado para:
-
-- Funções auxiliares
-- Código reutilizável que não pertence ao core
-
-Exemplo:
-
-- `window_state.py` → persistência de posição e tamanho da janela
+- layout
+- páginas
+- navegação
+- temas
 
 ---
 
 ## 📁 `tests/`
 
-Testes automatizados do projeto.
+Testes automatizados usando **pytest**.
 
-Mesmo que o projeto comece simples, essa pasta já existe para incentivar
-boas práticas desde o início.
+```
+tests/
+├─ test_smoke.py
+└─ test_math.py
+```
+
+### Características importantes
+
+- Não existe `conftest.py`
+- Não há manipulação manual de `sys.path`
+- Os testes dependem do projeto estar instalado em modo editável
+
+Isso é intencional e garante que:
+
+- os testes refletem o uso real do pacote
+- erros de import não sejam mascarados
+
+---
+
+### `test_smoke.py`
+
+Teste de fumaça simples para validar:
+
+- imports do pacote
+- estrutura básica do projeto
+
+---
+
+### `test_math.py`
+
+Teste propositalmente simples para validar:
+
+- funcionamento do pytest
+- descoberta de testes
+- imports corretos no `src` layout
+
+Usa uma função pura (`add`) definida em `app.py`.
+
+---
+
+## 📄 `pyproject.toml`
+
+Arquivo central de configuração do projeto.
+
+Responsável por:
+
+- definir o pacote Python
+- configurar o `src` layout
+- permitir instalação editável (`pip install -e .`)
+- configurar o pytest
+
+Este arquivo é essencial para que:
+
+- `python -m nicegui_app_template` funcione
+- debug no VS Code funcione
+- pytest funcione sem hacks
 
 ---
 
 ## 🧠 Resumo
 
-Essa estrutura foi pensada para:
+O fluxo correto do projeto é:
 
-- Ser fácil de entender
-- Evitar crescimento desorganizado
-- Funcionar bem com NiceGUI
-- Preparar o projeto para aplicações desktop no Windows
+```text
+pip install -e .
+python -m nicegui_app_template
+pytest
+```
 
-Você não precisa usar tudo desde o primeiro dia.
-A estrutura existe para **acompanhar o crescimento do projeto**, não para complicar.
+Essa estrutura:
+
+- evita ajustes manuais de PYTHONPATH
+- facilita debug
+- prepara o projeto para crescer
+- reduz problemas para iniciantes
+
+---
