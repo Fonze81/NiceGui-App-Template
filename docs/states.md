@@ -142,6 +142,7 @@ O módulo expõe a função:
 
 ```python
 get_app_state() -> AppState
+```
 
 Essa função implementa um singleton simples e controlado, adequado para aplicações desktop.
 
