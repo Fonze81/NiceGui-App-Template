@@ -1,3 +1,5 @@
+# src/nicegui_app_template/core/state.py
+
 from __future__ import annotations
 
 # =============================================================================
