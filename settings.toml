@@ -1,0 +1,74 @@
+# =============================================================================
+# Configurações da Aplicação
+# =============================================================================
+# Este arquivo contém as configurações persistentes do aplicativo.
+#
+# Regras importantes:
+# - Este arquivo pode ser editado manualmente
+# - Campos ausentes usam valores padrão definidos no código
+# - Campos inválidos sofrem fallback automático
+# - Campos de runtime NÃO são persistidos aqui
+#
+# Local recomendado:
+# - Mesmo diretório do executável (ou raiz do projeto em desenvolvimento)
+# =============================================================================
+
+
+# -----------------------------------------------------------------------------
+# Informações gerais do aplicativo
+# -----------------------------------------------------------------------------
+[app]
+name = "nicegui_app_template"
+version = "1.0.0"
+language = "pt-BR"
+first_run = true
+native_mode = true
+port = 8080
+
+
+# -----------------------------------------------------------------------------
+# Configurações da janela (modo desktop)
+# -----------------------------------------------------------------------------
+[app.window]
+x = 100
+y = 100
+width = 800
+height = 600
+maximized = false
+fullscreen = false
+monitor = 0
+storage_key = "nicegui_window_state_spa"
+
+
+# -----------------------------------------------------------------------------
+# Preferências visuais da interface
+# -----------------------------------------------------------------------------
+[app.ui]
+theme = "dark"
+font_scale = 1.0
+dense_mode = false
+accent_color = "#0057B8"
+
+
+# -----------------------------------------------------------------------------
+# Configurações de logging
+# -----------------------------------------------------------------------------
+# Observações:
+# - level deve ser um dos: CRITICAL, ERROR, WARNING, INFO, DEBUG, NOTSET
+# - rotation usa unidades amigáveis: B, KB, MB, GB
+# - retention define quantos arquivos de log antigos serão mantidos
+#
+[app.log]
+path = "logs/app.log"
+level = "INFO"
+console = true
+buffer_capacity = 500
+rotation = "5 MB"
+retention = 3
+
+
+# -----------------------------------------------------------------------------
+# Comportamento do aplicativo
+# -----------------------------------------------------------------------------
+[app.behavior]
+auto_save = true
