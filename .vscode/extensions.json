@@ -15,6 +15,7 @@
     "christian-kohler.path-intellisense",
     "yzhang.markdown-all-in-one",
     "pkief.material-icon-theme",
-    "hbenl.vscode-test-explorer"
+    "hbenl.vscode-test-explorer",
+    "tamasfe.even-better-toml"
   ]
 }
