@@ -1,10 +1,24 @@
 # Ambiente de Desenvolvimento
 
-Este documento explica como preparar o ambiente de desenvolvimento recomendado
-para trabalhar com o **NiceGui-App-Template**.
+Este documento descreve o **ambiente de desenvolvimento recomendado**
+para trabalhar com o **NiceGui-App-Template**, conforme as decisões técnicas
+definidas no projeto.
 
-O objetivo é garantir que qualquer pessoa consiga abrir o projeto e começar a
-desenvolver com o mínimo de configuração manual.
+O objetivo é garantir que qualquer pessoa consiga **abrir o projeto no VS Code
+e começar a desenvolver imediatamente**, com o mínimo de configuração manual.
+
+---
+
+## 📌 Premissas do Ambiente
+
+Este template assume:
+
+- Desenvolvimento focado em **Windows**
+- Uso de **Python 3.13**
+- Projeto executado sempre dentro de uma **virtual environment**
+- Editor principal: **Visual Studio Code**
+
+Essas premissas são aplicadas automaticamente sempre que possível.
 
 ---
 
@@ -12,52 +26,98 @@ desenvolver com o mínimo de configuração manual.
 
 O editor recomendado é o **Visual Studio Code (VS Code)**.
 
-Você pode baixá-lo gratuitamente em:
+Download oficial:
 https://code.visualstudio.com/
 
-O VS Code é indicado porque:
+O VS Code foi escolhido porque:
 
-- É fácil de usar
-- Funciona em Windows, Linux e macOS
 - Possui excelente suporte para Python
-- Permite instalar extensões para melhorar a produtividade
+- Integra-se bem com ambientes virtuais
+- Oferece debug, linting e formatação integrados
+- Funciona bem com projetos estruturados em `src/`
+
+Outros editores podem ser usados, mas **o template é otimizado para VS Code**.
 
 ---
 
 ## 🧩 Extensões do VS Code
 
-Este repositório contém o arquivo:
+Este repositório inclui o arquivo:
 
 ```
-
 .vscode/extensions.json
-
 ```
 
-Ao abrir o projeto no VS Code, ele irá **sugerir automaticamente** a instalação
-das extensões recomendadas.
+Ao abrir o projeto no VS Code, o editor **sugerirá automaticamente**
+a instalação das extensões recomendadas.
 
 Essas extensões ajudam com:
 
-- Organização do código
-- Correção automática de erros simples
-- Padronização entre diferentes computadores
-- Documentação e testes
+- padronização de código
+- formatação automática
+- organização do projeto
+- navegação e leitura do código
+- documentação e testes
 
 ### Extensões utilizadas
 
-- **Python**: suporte completo ao desenvolvimento em Python
-- **Ruff**: verifica e corrige problemas no código automaticamente
-- **Prettier**: formatação de arquivos JSON e Markdown
-- **Git Graph**: visualização do histórico do Git
-- **Bookmarks**: marca trechos importantes do código
-- **Todo Tree**: lista comentários como TODO e FIXME
-- **EditorConfig**: mantém o mesmo estilo de código em diferentes ambientes
-- **Path Intellisense**: ajuda com caminhos de arquivos
-- **Markdown All in One**: facilita a edição de arquivos Markdown
+As extensões abaixo são recomendadas automaticamente pelo VS Code ao abrir o projeto.
+Elas foram escolhidas para melhorar a produtividade, padronizar o ambiente e facilitar
+a leitura, execução e manutenção do código.
 
-> Não é necessário entender todas as extensões agora.
-> Elas funcionam automaticamente e ajudam a manter o projeto organizado.
+- **Python** (`ms-python.python`)  
+  Suporte principal ao desenvolvimento em Python.
+
+- **Python Debugger** (`ms-python.debugpy`)  
+  Integração do debug Python com o VS Code.
+
+- **Ruff** (`charliermarsh.ruff`)  
+  Linting e formatação de código conforme o padrão do projeto.
+
+- **Python Test Adapter** (`littlefoxteam.vscode-python-test-adapter`)  
+  Integração do pytest com o Test Explorer.
+
+- **Test Explorer UI** (`hbenl.vscode-test-explorer`)  
+  Interface visual para execução e acompanhamento de testes.
+
+- **Prettier** (`esbenp.prettier-vscode`)  
+  Formatação de arquivos Markdown, JSON e outros arquivos de apoio.
+
+- **Even Better TOML** (`tamasfe.even-better-toml`)  
+  Suporte avançado a arquivos TOML (`pyproject.toml`, `settings.toml`).
+
+- **EditorConfig** (`editorconfig.editorconfig`)  
+  Garantia de estilo consistente entre diferentes máquinas e editores.
+
+- **Git Graph** (`mhutchie.git-graph`)  
+  Visualização gráfica do histórico de commits.
+
+- **Todo Tree** (`gruntfuggly.todo-tree`)  
+  Organização visual de comentários TODO e FIXME.
+
+- **Bookmarks** (`alefragnani.bookmarks`)  
+  Marcação de pontos importantes no código.
+
+- **Trailing Spaces** (`shardulm94.trailing-spaces`)  
+  Identificação e remoção de espaços em branco desnecessários.
+
+- **Path Intellisense** (`christian-kohler.path-intellisense`)  
+  Autocomplete para caminhos de arquivos.
+
+- **Markdown All in One** (`yzhang.markdown-all-in-one`)  
+  Facilita a edição e navegação em arquivos Markdown.
+
+- **Dracula Theme** (`dracula-theme.theme-dracula`)  
+  Tema visual recomendado (opcional).
+
+- **FiraCode** (`seyyedkhandon.firacode`)  
+  Fonte com ligaduras para melhor leitura de código (opcional).
+
+- **Material Icon Theme** (`pkief.material-icon-theme`)  
+  Ícones de arquivos e pastas no Explorer do VS Code (opcional).
+
+> As extensões visuais (tema, fonte e ícones) são opcionais,
+> mas ajudam a manter uma experiência consistente entre desenvolvedores.
 
 ---
 
@@ -66,50 +126,52 @@ Essas extensões ajudam com:
 O projeto inclui o arquivo:
 
 ```
-
 .vscode/settings.json
-
 ```
 
 Esse arquivo configura o VS Code para:
 
-- Formatar o código automaticamente ao salvar
-- Organizar imports sem intervenção manual
-- Manter um estilo de código consistente
-- Melhorar a legibilidade do código
+- formatar o código automaticamente ao salvar
+- organizar imports sem intervenção manual
+- aplicar as regras do Ruff
+- manter um estilo consistente entre desenvolvedores
 
 Esses ajustes evitam problemas comuns como:
 
-- Código com estilos diferentes
-- Imports desorganizados
-- Erros simples que passam despercebidos
+- estilos de código inconsistentes
+- imports desorganizados
+- correções repetitivas em reviews
 
 ---
 
 ## 🐍 Ambiente Python
 
-É recomendado criar um **ambiente virtual Python** dentro do projeto,
-normalmente chamado de:
+O projeto utiliza um **ambiente virtual Python**, com o nome padrão:
 
 ```
-
 .venv
-
 ```
 
-Isso ajuda a:
+Esse ambiente é usado para:
 
-- Isolar dependências do projeto
-- Evitar conflitos com outros projetos Python
-- Facilitar a reprodução do ambiente em outra máquina
+- isolar dependências do projeto
+- garantir o uso do **Python 3.13**
+- evitar conflitos com outros projetos Python
 
-O VS Code já está configurado para tentar usar esse ambiente automaticamente,
-caso ele exista.
+O VS Code já está configurado para:
+
+- detectar automaticamente a `.venv`
+- usar o interpretador correto
+- integrar o ambiente ao debug e aos testes
+
+> A criação da venv e a instalação do projeto
+> estão documentadas em **Run the App (Windows)**.
 
 ---
 
-## 📌 Observações
+## 📌 Observações finais
 
-- As configurações fazem parte do template
-- Você não precisa alterar nada para começar
-- Ajustes pessoais podem ser feitos localmente, sem alterar o projeto
+- Todas as configurações fazem parte do template
+- Nenhum ajuste manual é necessário para começar
+- Configurações pessoais podem ser feitas localmente
+- Arquivos dentro de `.vscode/` não devem ser alterados sem necessidade
