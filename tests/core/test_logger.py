@@ -1,26 +1,30 @@
-# tests/test_logger.py
-#
-# Testes automatizados do módulo de logging do template.
-#
-# Objetivos gerais:
-# - Validar o ciclo de vida completo do logger (bootstrap -> arquivo -> shutdown)
-# - Garantir propagação correta entre logger raiz e loggers filhos
-# - Garantir idempotência (não duplicar handlers)
-# - Garantir flush do buffer em memória (MemoryHandler)
-# - Garantir encerramento limpo (evitar lock de arquivo no Windows)
-# - Validar que mensagens internas de DEBUG do próprio logger são gravadas
-#
-# Conceitos importantes para iniciantes:
-# - Idempotência: chamar uma função várias vezes não deve causar efeitos colaterais
-# - Flakiness: testes que falham às vezes por timing, buffer ou I/O
-# - logging é global: loggers ficam em cache por nome dentro do processo Python
-
+# tests/core/test_logger.py
 
 from __future__ import annotations
 
-# =============================================================================
+# -----------------------------------------------------------------------------
+# Testes do módulo de logging (core/logger.py)
+# -----------------------------------------------------------------------------
+# Este módulo valida o comportamento do sistema de logging do template,
+# cobrindo todo o ciclo de vida do logger:
+#
+# - Bootstrap inicial com buffer em memória
+# - Propagação correta entre logger raiz e loggers filhos
+# - Ativação do logging em arquivo (RotatingFileHandler)
+# - Garantia de idempotência (não duplicar handlers)
+# - Flush correto do MemoryHandler
+# - Encerramento limpo (evitar lock de arquivos no Windows)
+# - Registro das mensagens internas de DEBUG do próprio logger
+#
+# Observações importantes:
+# - O módulo logging é global no processo Python
+# - Loggers são cacheados por nome
+# - Falhas de limpeza podem causar flakiness ou lock de arquivos no Windows
+# -----------------------------------------------------------------------------
+
+# -----------------------------------------------------------------------------
 # Imports
-# =============================================================================
+# -----------------------------------------------------------------------------
 import logging
 from logging.handlers import MemoryHandler, RotatingFileHandler
 from pathlib import Path
@@ -30,18 +34,18 @@ import pytest
 
 from nicegui_app_template.core.logger import LogConfig, create_bootstrapper, get_logger
 
-# =============================================================================
+# -----------------------------------------------------------------------------
 # Helpers
-# =============================================================================
+# -----------------------------------------------------------------------------
 
 
 def _unique_logger_name(prefix: str = "nicegui_app_template") -> str:
     """
-    Gera um nome único de logger para evitar interferência entre testes.
+    Gera um nome único de logger para cada teste.
 
     Motivo:
-    - O módulo logging é global e reaproveita loggers pelo nome
-    - Usar nomes únicos evita vazamento de estado entre testes
+    - O logging reutiliza loggers pelo nome em nível global
+    - Nomes únicos evitam vazamento de handlers e estado entre testes
     """
     return f"{prefix}.{uuid4().hex}"
 
@@ -50,7 +54,10 @@ def _read_text(path: Path) -> str:
     """
     Lê o conteúdo de um arquivo de texto.
 
-    Retorna string vazia se o arquivo não existir.
+    Retorna string vazia caso o arquivo não exista.
+
+    Motivo:
+    - Simplifica a leitura de logs sem precisar tratar exceções no chamador
     """
     if not path.exists():
         return ""
@@ -59,19 +66,19 @@ def _read_text(path: Path) -> str:
 
 def _read_log_with_backups(base_log_file: Path, backup_count: int) -> str:
     """
-    Lê o log principal e todos os arquivos de backup gerados pela rotação.
+    Lê o arquivo de log principal e todos os backups gerados pela rotação.
 
     Motivo:
-    - RotatingFileHandler pode mover logs antigos para .1, .2, etc.
-    - O arquivo principal pode conter apenas as últimas linhas
-    - Para evitar flakiness, consideramos todos os arquivos
+    - RotatingFileHandler pode mover mensagens antigas para arquivos .1, .2, etc.
+    - O arquivo principal pode conter apenas parte das mensagens
+    - Considerar todos os arquivos reduz flakiness nos testes
     """
     parts: list[str] = []
 
     # Arquivo principal (ex.: app.log)
     parts.append(_read_text(base_log_file))
 
-    # Backups (ex.: app.log.1, app.log.2, ...)
+    # Arquivos de backup (ex.: app.log.1, app.log.2, ...)
     for i in range(1, backup_count + 1):
         parts.append(_read_text(base_log_file.with_name(f"{base_log_file.name}.{i}")))
 
@@ -81,32 +88,37 @@ def _read_log_with_backups(base_log_file: Path, backup_count: int) -> str:
 def _count_handlers(logger: logging.Logger, handler_type: type[logging.Handler]) -> int:
     """
     Conta quantos handlers de um determinado tipo existem no logger.
+
+    Motivo:
+    - Facilita validação de idempotência
+    - Evita lógica duplicada nos testes
     """
     return sum(1 for h in logger.handlers if isinstance(h, handler_type))
 
 
 def _flush_all_handlers(logger: logging.Logger) -> None:
     """
-    Força flush de todos os handlers do logger.
+    Força flush de todos os handlers associados ao logger.
 
     Motivo:
     - Garantir que os dados já foram gravados em disco antes da leitura
-    - Reduz flakiness em testes envolvendo I/O
+    - Reduz flakiness em testes que envolvem I/O
     """
     for handler in list(logger.handlers):
         try:
             handler.flush()
         except Exception:
+            # Em testes, falhas de flush não devem quebrar o fluxo
             pass
 
 
 def _cleanup_logger_by_name(logger_name: str) -> None:
     """
-    Remove e fecha todos os handlers de um logger pelo nome.
+    Remove e fecha todos os handlers de um logger identificado pelo nome.
 
     Motivo:
-    - logging é global e pode manter handlers abertos se um teste falhar
-    - No Windows, isso pode causar lock de arquivos temporários
+    - logging é global e pode manter handlers abertos após falha de testes
+    - No Windows, handlers de arquivo abertos causam lock em diretórios temporários
     """
     logger = logging.getLogger(logger_name)
 
@@ -121,6 +133,7 @@ def _cleanup_logger_by_name(logger_name: str) -> None:
         except Exception:
             pass
 
+    # Restaurar estado neutro do logger
     logger.propagate = True
     logger.setLevel(logging.NOTSET)
 
@@ -134,6 +147,10 @@ def _make_config(
 ) -> LogConfig:
     """
     Cria uma configuração de logger adequada para testes.
+
+    Motivo:
+    - Centraliza parâmetros comuns
+    - Usa limites pequenos para facilitar testes de rotação
     """
     return LogConfig(
         name=name,
@@ -146,15 +163,15 @@ def _make_config(
     )
 
 
-# =============================================================================
+# -----------------------------------------------------------------------------
 # Fixture
-# =============================================================================
+# -----------------------------------------------------------------------------
 
 
 @pytest.fixture
 def logger_ctx(tmp_path: Path):
     """
-    Fixture que cria um ambiente isolado para cada teste.
+    Cria um contexto isolado de logger para cada teste.
 
     Entrega:
     - bootstrapper
@@ -162,7 +179,9 @@ def logger_ctx(tmp_path: Path):
     - log_file
     - root_logger
 
-    Garante shutdown e limpeza mesmo se o teste falhar.
+    Garantias:
+    - Ambiente isolado por teste
+    - Shutdown e limpeza executados mesmo em caso de falha
     """
     root_name = _unique_logger_name()
     log_file = tmp_path / "logs" / "app.log"
@@ -180,6 +199,7 @@ def logger_ctx(tmp_path: Path):
     try:
         yield bootstrapper, root_name, log_file, root_logger
     finally:
+        # Garantir liberação de recursos mesmo se o teste falhar
         try:
             bootstrapper.shutdown()
         except Exception:
@@ -187,14 +207,17 @@ def logger_ctx(tmp_path: Path):
         _cleanup_logger_by_name(root_name)
 
 
-# =============================================================================
+# -----------------------------------------------------------------------------
 # Tests
-# =============================================================================
+# -----------------------------------------------------------------------------
 
 
 def test_bootstrap_attaches_memory_handler(logger_ctx) -> None:
     """
-    bootstrap() deve anexar exatamente um MemoryHandler.
+    bootstrap() deve anexar exatamente um MemoryHandler ao logger raiz.
+
+    Motivo:
+    - O buffer em memória captura logs antes do arquivo estar disponível
     """
     bootstrapper, _root_name, _log_file, root_logger = logger_ctx
 
@@ -206,6 +229,10 @@ def test_bootstrap_attaches_memory_handler(logger_ctx) -> None:
 def test_child_loggers_propagate_to_configured_root_name(logger_ctx) -> None:
     """
     Loggers filhos devem propagar mensagens para o logger raiz configurado.
+
+    Motivo:
+    - Garante hierarquia correta de logging
+    - Evita necessidade de configurar handlers em cada módulo
     """
     bootstrapper, root_name, _log_file, root_logger = logger_ctx
 
@@ -220,6 +247,9 @@ def test_child_loggers_propagate_to_configured_root_name(logger_ctx) -> None:
 def test_get_logger_returns_root_when_called_without_name(logger_ctx) -> None:
     """
     get_logger() sem argumentos deve retornar o logger raiz atual do app.
+
+    Motivo:
+    - Simplifica uso em código que não precisa de logger nomeado
     """
     bootstrapper, root_name, _log_file, _root_logger = logger_ctx
 
@@ -231,7 +261,10 @@ def test_get_logger_returns_root_when_called_without_name(logger_ctx) -> None:
 
 def test_buffered_logs_are_flushed_to_file_after_enable(logger_ctx) -> None:
     """
-    Logs emitidos antes do enable_file_logging devem aparecer no arquivo.
+    Logs emitidos antes da ativação do arquivo devem ser persistidos após enable.
+
+    Motivo:
+    - Evitar perda de mensagens de inicialização
     """
     bootstrapper, root_name, log_file, root_logger = logger_ctx
 
@@ -256,7 +289,8 @@ def test_enable_file_logging_is_idempotent(logger_ctx) -> None:
     """
     enable_file_logging() deve ser idempotente.
 
-    Chamar várias vezes não deve criar handlers duplicados.
+    Motivo:
+    - Chamar várias vezes não deve criar handlers duplicados
     """
     bootstrapper, _root_name, log_file, root_logger = logger_ctx
 
@@ -290,9 +324,9 @@ def test_shutdown_detaches_file_handler_to_avoid_windows_locks(logger_ctx) -> No
 
 def test_internal_debug_messages_are_written_when_level_is_debug(logger_ctx) -> None:
     """
-    Quando o nível é DEBUG, o próprio logger deve registrar mensagens internas.
+    Em nível DEBUG, o próprio logger deve registrar mensagens internas.
 
-    Valida mensagens de:
+    Valida mensagens emitidas durante:
     - bootstrap
     - enable_file_logging
     - shutdown
@@ -304,7 +338,6 @@ def test_internal_debug_messages_are_written_when_level_is_debug(logger_ctx) -> 
     bootstrapper.shutdown()
 
     _flush_all_handlers(root_logger)
-
     content = _read_log_with_backups(log_file, backup_count=2)
 
     assert "Logger bootstrap started" in content
@@ -318,6 +351,10 @@ def test_internal_debug_messages_are_written_when_level_is_debug(logger_ctx) -> 
 def test_enable_file_logging_flushes_memory_buffer(logger_ctx) -> None:
     """
     enable_file_logging() deve descarregar o buffer em memória e removê-lo.
+
+    Motivo:
+    - Evitar duplicação de handlers
+    - Garantir que mensagens antigas sejam persistidas
     """
     bootstrapper, root_name, log_file, root_logger = logger_ctx
 
