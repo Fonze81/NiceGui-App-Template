@@ -13,8 +13,7 @@
   "editor.formatOnSave": true,
 
   "editor.codeActionsOnSave": {
-    "source.fixAll": "explicit",
-    "source.organizeImports": "explicit"
+    "source.fixAll": true
   },
 
   // Python
@@ -22,7 +21,7 @@
   "python.analysis.autoSearchPaths": true,
   "python.analysis.useLibraryCodeForTypes": true,
 
-  // Ajuste automático do interpretador se houver venv local
+  // Ajuste automático do interpretador se houver venv local (Windows)
   "python.defaultInterpreterPath": ".venv/Scripts/python.exe",
 
   // Ruff (lint + fix + imports)
@@ -49,23 +48,15 @@
   "files.eol": "\n",
 
   // TODO Tree
-  "todo-tree.general.tags": [
-    "TODO",
-    "FIXME",
-    "BUG",
-    "HACK",
-    "NOTE"
-  ],
+  "todo-tree.general.tags": ["TODO", "FIXME", "BUG", "HACK", "NOTE"],
 
   // Git
   "git.autofetch": true,
   "git.enableSmartCommit": true,
 
-  // Test
+  // Testes
   "python.testing.pytestEnabled": true,
   "python.testing.unittestEnabled": false,
-  "python.testing.pytestArgs": [
-    "tests"
-  ],
+  "python.testing.pytestArgs": ["tests"],
   "python.testing.autoTestDiscoverOnSaveEnabled": true
 }
