@@ -2,17 +2,40 @@
 
 from __future__ import annotations
 
+# -----------------------------------------------------------------------------
+# Testes do módulo de settings (core/settings.py)
+# -----------------------------------------------------------------------------
+# Este arquivo valida o comportamento do módulo de settings de forma isolada:
+# - parsing e helpers internos (deep_get, parse_size_to_bytes, loads_toml, to_toml_string)
+# - aplicação de settings em um estado em memória (apply_settings_to_state)
+# - serialização do estado para estrutura persistível (build_raw_from_state)
+# - fluxos de I/O (load_settings / save_settings), incluindo escrita atômica
+#
+# Decisão de teste:
+# - Usamos um estado fake (_FakeAppState) para evitar dependência do estado real do app.
+# - Isso mantém o teste focado no contrato do módulo de settings e reduz acoplamento.
+# - Como o Pylance realiza checagem nominal de tipos, usamos cast apenas nos testes
+#   quando a função espera AppState (ou AppState | None), mas aceitamos um fake
+#   estrutural compatível em runtime.
+# -----------------------------------------------------------------------------
+
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from types import SimpleNamespace
-from typing import Any, Mapping
+from typing import Any, Mapping, cast
 
 import pytest
 
 from nicegui_app_template.core import settings as settings_module
+from nicegui_app_template.core.state import AppState
 
 
+# -----------------------------------------------------------------------------
+# Estados mínimos para testes
+# -----------------------------------------------------------------------------
+# Estes dataclasses reproduzem apenas os campos que o módulo de settings acessa.
+# A intenção é validar parsing, defaults e fallback sem depender do AppState real.
+# -----------------------------------------------------------------------------
 @dataclass
 class _MetaState:
     name: str = "MyApp"
@@ -80,25 +103,40 @@ class _FakeAppState:
         self.last_save_ok: bool = False
 
 
+# -----------------------------------------------------------------------------
+# Fixtures
+# -----------------------------------------------------------------------------
 @pytest.fixture()
 def fake_state() -> _FakeAppState:
+    """Fornece um estado fake novo para cada teste."""
     return _FakeAppState()
 
 
 @pytest.fixture()
 def test_logger() -> logging.Logger:
-    # Um logger real é útil para caplog e para validar que erros são emitidos com logger injetado.
+    """
+    Cria um logger real para os testes.
+
+    Motivo:
+    - Permite validar comportamento com logger injetado
+    - Facilita inspeção de mensagens via caplog
+    """
     logger = logging.getLogger("test_settings_logger")
     logger.setLevel(logging.DEBUG)
     return logger
 
 
+# -----------------------------------------------------------------------------
+# Testes: helpers internos
+# -----------------------------------------------------------------------------
 def test_deep_get_returns_value_when_present() -> None:
+    """Garante que _deep_get retorna o valor quando a chave existe."""
     raw: Mapping[str, Any] = {"app": {"window": {"width": 123}}}
     assert settings_module._deep_get(raw, "app.window.width", 999) == 123
 
 
 def test_deep_get_returns_default_when_missing() -> None:
+    """Garante que _deep_get retorna o default quando a chave não existe."""
     raw: Mapping[str, Any] = {"app": {"window": {}}}
     assert settings_module._deep_get(raw, "app.window.height", 777) == 777
 
@@ -115,15 +153,24 @@ def test_deep_get_returns_default_when_missing() -> None:
     ],
 )
 def test_parse_size_to_bytes_valid(text: str, expected: int) -> None:
+    """Garante que tamanhos válidos sejam convertidos corretamente para bytes."""
     assert settings_module._parse_size_to_bytes(text) == expected
 
 
 @pytest.mark.parametrize("text", ["", "10", "10 TB", "abc", "10  MB  X", "10MiB"])
 def test_parse_size_to_bytes_invalid_returns_none(text: str) -> None:
+    """Garante que entradas inválidas retornem None, sem exceção."""
     assert settings_module._parse_size_to_bytes(text) is None
 
 
 def test_to_toml_string_minimal_serialization_and_newline() -> None:
+    """
+    Valida o serializador mínimo em TOML.
+
+    Requisitos:
+    - newline final para compatibilidade com ferramentas e diffs
+    - geração de seções e chaves esperadas
+    """
     data = {
         "app": {
             "name": "MeuApp",
@@ -141,10 +188,8 @@ def test_to_toml_string_minimal_serialization_and_newline() -> None:
 
     toml_text = settings_module._to_toml_string(data)
 
-    # Garante newline final para compatibilidade com ferramentas e diffs.
     assert toml_text.endswith("\n")
 
-    # Estrutura mínima esperada.
     assert "[app]" in toml_text
     assert 'name = "MeuApp"' in toml_text
     assert "[app.window]" in toml_text
@@ -155,23 +200,35 @@ def test_to_toml_string_minimal_serialization_and_newline() -> None:
 
 
 def test_to_toml_string_escapes_quotes_and_backslashes() -> None:
+    """
+    Valida escaping básico em strings TOML.
+
+    Motivo:
+    - Settings frequentemente incluem paths Windows com backslashes
+    - Strings com aspas precisam permanecer válidas em TOML
+    """
     data = {"root": {"text": 'a "b" c', "path": r"C:\temp\file.txt"}}
     toml_text = settings_module._to_toml_string(data)
 
-    # Aspas devem ser escapadas.
     assert 'text = "a \\"b\\" c"' in toml_text
-
-    # Backslashes devem ser preservadas de forma válida em TOML.
     assert 'path = "C:\\\\temp\\\\file.txt"' in toml_text
 
 
 def test_to_toml_string_raises_for_unsupported_type() -> None:
-    data = {"bad": {"items": ["a", "b"]}}  # Arrays não são suportados pelo serializador mínimo.
+    """
+    Garante que tipos não suportados falhem explicitamente.
+
+    Motivo:
+    - O serializador é intencionalmente mínimo
+    - Falhar cedo evita arquivos inválidos e bugs silenciosos
+    """
+    data = {"bad": {"items": ["a", "b"]}}
     with pytest.raises(TypeError):
         settings_module._to_toml_string(data)
 
 
 def test_loads_toml_parses_basic_document() -> None:
+    """Garante que o parser TOML interno consegue ler estrutura básica."""
     raw = settings_module._loads_toml(
         """
         [app]
@@ -188,7 +245,20 @@ def test_loads_toml_parses_basic_document() -> None:
     assert raw["app"]["window"]["width"] == 1200
 
 
-def test_apply_settings_to_state_applies_values_and_fallbacks(fake_state: _FakeAppState) -> None:
+# -----------------------------------------------------------------------------
+# Testes: aplicação de settings no estado
+# -----------------------------------------------------------------------------
+def test_apply_settings_to_state_applies_values_and_fallbacks(
+    fake_state: _FakeAppState,
+) -> None:
+    """
+    Valida que apply_settings_to_state aplica valores e executa fallbacks.
+
+    Observação:
+    - Alguns campos intencionalmente inválidos devem cair para defaults seguros.
+    - Usamos cast(AppState, fake_state) apenas para satisfazer o type checker.
+      Em runtime, o fake atende ao contrato estrutural esperado pela função.
+    """
     raw = {
         "app": {
             "name": "X",
@@ -225,13 +295,12 @@ def test_apply_settings_to_state_applies_values_and_fallbacks(fake_state: _FakeA
         }
     }
 
-    settings_module.apply_settings_to_state(fake_state, raw)
+    settings_module.apply_settings_to_state(cast(AppState, fake_state), raw)
 
     assert fake_state.meta.name == "X"
     assert fake_state.meta.version == "9.9.9"
     assert fake_state.meta.first_run is False
 
-    # Fallbacks / validações leves
     assert fake_state.meta.port == 8080
     assert fake_state.window.width == 800
     assert fake_state.window.height == 600
@@ -240,46 +309,64 @@ def test_apply_settings_to_state_applies_values_and_fallbacks(fake_state: _FakeA
     assert fake_state.log.rotation == "5 MB"
     assert fake_state.log.retention == 3
 
-    # Casting/atribuição
     assert fake_state.log.path == Path("logs/x.log")
     assert fake_state.behavior.auto_save is True
 
 
-def test_build_raw_from_state_contains_only_persistent_fields(fake_state: _FakeAppState) -> None:
+def test_build_raw_from_state_contains_only_persistent_fields(
+    fake_state: _FakeAppState,
+) -> None:
+    """
+    Garante que build_raw_from_state gere apenas campos persistíveis.
+
+    Requisitos:
+    - Estrutura "app" como raiz
+    - Paths persistidos como string com separador normalizado
+    - Flags runtime não devem vazar para o arquivo
+    """
     fake_state.meta.name = "MeuApp"
     fake_state.log.path = Path(r"logs\app.log")
 
-    raw = settings_module.build_raw_from_state(fake_state)
+    raw = settings_module.build_raw_from_state(cast(AppState, fake_state))
 
-    # Deve conter apenas "app" e seus filhos, sem flags runtime do state.
     assert list(raw.keys()) == ["app"]
     assert raw["app"]["name"] == "MeuApp"
-
-    # Path deve ser persistido como string com separador normalizado.
     assert raw["app"]["log"]["path"] == "logs/app.log"
-
-    # Flags runtime não devem ser persistidas.
     assert "last_error" not in raw["app"]
 
 
+# -----------------------------------------------------------------------------
+# Testes: load_settings (I/O)
+# -----------------------------------------------------------------------------
 def test_load_settings_returns_false_when_file_missing_sets_state_error(
     tmp_path: Path,
     fake_state: _FakeAppState,
     test_logger: logging.Logger,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
+    """
+    Valida o comportamento quando o arquivo não existe.
+
+    Requisitos:
+    - Retorno False
+    - Flags de runtime e mensagem de erro atualizadas no state
+    - Erro logado quando logger é injetado
+    """
     settings_path = tmp_path / "settings.toml"
     assert not settings_path.exists()
 
     caplog.set_level(logging.DEBUG)
 
-    ok = settings_module.load_settings(settings_path=settings_path, state=fake_state, logger=test_logger)
+    ok = settings_module.load_settings(
+        settings_path=settings_path,
+        state=cast(AppState, fake_state),
+        logger=test_logger,
+    )
     assert ok is False
     assert fake_state.last_load_ok is False
     assert fake_state.last_error is not None
     assert "Settings file not found" in fake_state.last_error
 
-    # Com logger injetado, esperamos um erro registrado.
     assert any("Settings file not found" in rec.getMessage() for rec in caplog.records)
 
 
@@ -289,6 +376,15 @@ def test_load_settings_success_applies_settings_and_sets_flags(
     test_logger: logging.Logger,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
+    """
+    Valida load_settings em cenário de sucesso.
+
+    Requisitos:
+    - Retorno True
+    - Atualização do state com settings carregados
+    - Normalização de nível de log
+    - Mensagem de sucesso registrada no logger
+    """
     settings_path = tmp_path / "settings.toml"
     settings_path.write_text(
         """
@@ -317,7 +413,11 @@ def test_load_settings_success_applies_settings_and_sets_flags(
 
     caplog.set_level(logging.INFO)
 
-    ok = settings_module.load_settings(settings_path=settings_path, state=fake_state, logger=test_logger)
+    ok = settings_module.load_settings(
+        settings_path=settings_path,
+        state=cast(AppState, fake_state),
+        logger=test_logger,
+    )
     assert ok is True
     assert fake_state.last_load_ok is True
     assert fake_state.last_error is None
@@ -338,18 +438,31 @@ def test_load_settings_success_applies_settings_and_sets_flags(
 
     assert fake_state.behavior.auto_save is True
 
-    assert any("Settings loaded successfully" in rec.getMessage() for rec in caplog.records)
+    assert any(
+        "Settings loaded successfully" in rec.getMessage() for rec in caplog.records
+    )
 
 
+# -----------------------------------------------------------------------------
+# Testes: save_settings (I/O)
+# -----------------------------------------------------------------------------
 def test_save_settings_success_writes_toml_and_sets_flags(
     tmp_path: Path,
     fake_state: _FakeAppState,
     test_logger: logging.Logger,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
+    """
+    Valida save_settings em cenário de sucesso.
+
+    Requisitos:
+    - Retorno True
+    - Conteúdo TOML com seções esperadas
+    - Escrita atômica sem deixar arquivo temporário residual
+    - Mensagem de sucesso registrada no logger
+    """
     settings_path = tmp_path / "settings.toml"
 
-    # Forçar alguns valores para validar persistência.
     fake_state.meta.name = "MeuApp"
     fake_state.meta.port = 8082
     fake_state.window.width = 1000
@@ -363,7 +476,11 @@ def test_save_settings_success_writes_toml_and_sets_flags(
 
     caplog.set_level(logging.INFO)
 
-    ok = settings_module.save_settings(settings_path=settings_path, state=fake_state, logger=test_logger)
+    ok = settings_module.save_settings(
+        settings_path=settings_path,
+        state=cast(AppState, fake_state),
+        logger=test_logger,
+    )
     assert ok is True
     assert fake_state.last_save_ok is True
     assert fake_state.last_error is None
@@ -377,15 +494,15 @@ def test_save_settings_success_writes_toml_and_sets_flags(
     assert "width = 1000" in text
     assert "height = 700" in text
 
-    # Deve gravar como string normalizada para facilitar edição e portabilidade.
     assert "[app.log]" in text
     assert 'path = "logs/app.log"' in text
 
-    # Arquivo temporário não deve sobrar após replace.
     tmp_candidate = settings_path.with_suffix(settings_path.suffix + ".tmp")
     assert not tmp_candidate.exists()
 
-    assert any("Settings saved successfully" in rec.getMessage() for rec in caplog.records)
+    assert any(
+        "Settings saved successfully" in rec.getMessage() for rec in caplog.records
+    )
 
 
 def test_save_settings_uses_state_last_loaded_path_when_settings_path_not_provided(
@@ -393,15 +510,25 @@ def test_save_settings_uses_state_last_loaded_path_when_settings_path_not_provid
     fake_state: _FakeAppState,
     test_logger: logging.Logger,
 ) -> None:
-    # Simula que o app já carregou de um path específico.
+    """
+    Valida que save_settings usa o último path conhecido no state quando omitido.
+
+    Motivo:
+    - Após o load inicial, é comum salvar sem repassar o caminho explicitamente.
+    """
     settings_path = tmp_path / "settings.toml"
     fake_state.settings_file_path = settings_path
 
-    ok = settings_module.save_settings(state=fake_state, logger=test_logger)
+    ok = settings_module.save_settings(
+        state=cast(AppState, fake_state), logger=test_logger
+    )
     assert ok is True
     assert settings_path.exists()
 
 
+# -----------------------------------------------------------------------------
+# Testes: caminhos padrão e fallback de dependências (monkeypatch)
+# -----------------------------------------------------------------------------
 def test_load_settings_uses_default_settings_path_when_no_path_provided(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -420,7 +547,9 @@ def test_load_settings_uses_default_settings_path_when_no_path_provided(
 
     monkeypatch.setattr(settings_module, "default_settings_path", lambda: settings_path)
 
-    ok = settings_module.load_settings(state=fake_state, logger=test_logger)
+    ok = settings_module.load_settings(
+        state=cast(AppState, fake_state), logger=test_logger
+    )
     assert ok is True
     assert fake_state.meta.name == "MeuApp"
     assert fake_state.settings_file_path == settings_path.resolve()
@@ -432,12 +561,15 @@ def test_save_settings_uses_default_settings_path_when_no_path_and_no_state_file
     fake_state: _FakeAppState,
     test_logger: logging.Logger,
 ) -> None:
+    """Valida fallback para default_settings_path quando não há path disponível."""
     settings_path = tmp_path / "settings.toml"
     monkeypatch.setattr(settings_module, "default_settings_path", lambda: settings_path)
 
     fake_state.settings_file_path = None
 
-    ok = settings_module.save_settings(state=fake_state, logger=test_logger)
+    ok = settings_module.save_settings(
+        state=cast(AppState, fake_state), logger=test_logger
+    )
     assert ok is True
     assert settings_path.exists()
 
@@ -472,6 +604,7 @@ def test_save_settings_uses_get_app_state_when_state_not_provided(
     monkeypatch: pytest.MonkeyPatch,
     test_logger: logging.Logger,
 ) -> None:
+    """Valida que save_settings usa get_app_state() quando state não é informado."""
     settings_path = tmp_path / "settings.toml"
     st = _FakeAppState()
 
@@ -483,17 +616,26 @@ def test_save_settings_uses_get_app_state_when_state_not_provided(
     assert settings_path.exists()
 
 
+# -----------------------------------------------------------------------------
+# Testes: logger e escrita atômica
+# -----------------------------------------------------------------------------
 def test_get_logger_returns_null_logger_when_none() -> None:
+    """
+    Garante que _get_logger(None) retorne um logger silencioso e seguro.
+
+    Motivo:
+    - Permite que o módulo opere antes do logger principal estar configurado
+    - Evita warnings do logging quando nenhum handler está presente
+    """
     log = settings_module._get_logger(None)
 
-    # Deve ser um logger funcional e silencioso (sem handlers de console).
     assert isinstance(log, logging.Logger)
-
-    # Deve ter pelo menos um handler NullHandler para evitar warnings.
     assert any(isinstance(h, logging.NullHandler) for h in log.handlers)
 
 
-def test_atomic_write_text_creates_parent_dir_and_is_atomic_like(tmp_path: Path) -> None:
+def test_atomic_write_text_creates_parent_dir_and_is_atomic_like(
+    tmp_path: Path,
+) -> None:
     """
     Teste direto do helper de escrita atômica.
 
@@ -507,6 +649,5 @@ def test_atomic_write_text_creates_parent_dir_and_is_atomic_like(tmp_path: Path)
     assert file_path.exists()
     assert file_path.read_text(encoding="utf-8") == "x=1\n"
 
-    # Arquivo temporário não deve ficar no disco ao final.
     tmp_candidate = file_path.with_suffix(file_path.suffix + ".tmp")
     assert not tmp_candidate.exists()
