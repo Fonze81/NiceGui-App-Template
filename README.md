@@ -1,6 +1,7 @@
 # NiceGui-App-Template
 
-![Status](https://img.shields.io/badge/status-em%20desenvolvimento-yellow)
+![Status](https://img.shields.io/badge/status-alpha-orange)
+![Version](https://img.shields.io/badge/version-0.1.0a1-orange)
 ![Python](https://img.shields.io/badge/python-3.13-blue)
 ![Platform](https://img.shields.io/badge/platform-Windows-blue)
 ![NiceGUI](https://img.shields.io/badge/framework-NiceGUI-009688)
