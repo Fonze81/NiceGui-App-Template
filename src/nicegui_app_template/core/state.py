@@ -43,7 +43,7 @@ class AppMetaState:
     name: str = "nicegui_app_template"
 
     # Versão do aplicativo (informativa; útil para diagnóstico e suporte).
-    version: str = "0.0.0"
+    version: str = "0.1.0a2"
 
     # Idioma padrão da interface (controle centralizado evita divergências).
     language: str = "pt-BR"
