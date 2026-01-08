@@ -1,4 +1,4 @@
-# src/nicegui_app_template/__mains__.py
+# src/nicegui_app_template/__main__.py
 
 from __future__ import annotations
 
