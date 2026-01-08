@@ -9,7 +9,7 @@ name = "nicegui-app-template"
 version = "0.1.0a1"
 description = "NiceGUI app template (Windows-first)"
 requires-python = "==3.13.*"
-dependencies = ["nicegui>=3.4"]
+dependencies = ["nicegui>=3.4.1"]
 
 [tool.setuptools]
 package-dir = { "" = "src" }
