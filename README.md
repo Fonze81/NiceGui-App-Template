@@ -1,30 +1,67 @@
 # NiceGui-App-Template
 
-Este repositório é um **template inicial** para criar aplicações **desktop ou web**
-utilizando **NiceGUI** com Python, **com foco exclusivo no Windows**.
+![Status](https://img.shields.io/badge/status-em%20desenvolvimento-yellow)
+![Python](https://img.shields.io/badge/python-3.13-blue)
+![Platform](https://img.shields.io/badge/platform-Windows-blue)
+![NiceGUI](https://img.shields.io/badge/framework-NiceGUI-009688)
+![Code Style](https://img.shields.io/badge/code%20style-ruff-black)
+![Tests](https://img.shields.io/badge/tests-pytest-green)
 
-O objetivo é facilitar o início de novos projetos, oferecendo uma base organizada,
-padronizada e fácil de entender, preparada principalmente para **aplicações
-desktop nativas no Windows**.
+Este repositório é um **template inicial para criação de aplicações desktop ou web**
+utilizando **NiceGUI** com Python, com **foco técnico exclusivo no Windows**.
+
+⚠️ **Status do projeto:**
+
+> **Em desenvolvimento ativo** - a estrutura principal está definida, mas o template
+> continuará evoluindo com novos exemplos, boas práticas e recursos.
+
+O objetivo é facilitar o início de novos projetos, oferecendo uma base **organizada,
+padronizada e fácil de entender**, preparada principalmente para **aplicações desktop
+nativas no Windows**.
 
 ---
 
 ## 🚀 O que este template oferece
 
-- Estrutura básica organizada para projetos NiceGUI
+- Estrutura organizada para projetos NiceGUI
 - Base preparada para aplicações web e desktop nativas no Windows
 - Separação clara entre layout, páginas e infraestrutura
 - Ambiente de desenvolvimento padronizado
-- Estrutura pronta para crescer sem virar bagunça
+- Suporte a execução, testes e debug sem configurações manuais
+- Estrutura pensada para crescer sem virar bagunça
 
-Este template foi pensado para ser simples no início e evoluir conforme o projeto cresce.
+Este template foi projetado para ser **simples no início** e **evoluir de forma segura**
+conforme o projeto cresce.
+
+---
+
+## 📐 Premissas do Template
+
+Este projeto adota decisões técnicas claras, aplicadas de forma consistente em toda a base:
+
+- **Python 3.13** como versão oficial
+- Uso de **src layout**
+- Execução do aplicativo **como módulo**
+- Ambiente sempre isolado em **virtual environment (venv)**
+- Foco em aplicações **desktop nativas no Windows**
+- Debug e testes integrados desde o início
+- Padronização de código com **Ruff**
+- Testes automatizados com **Pytest**
+
+Essas decisões não são opcionais e fazem parte do padrão do template.
 
 ---
 
 ## 🧰 Ambiente de Desenvolvimento
 
-As instruções completas sobre instalação do editor, extensões recomendadas
-e ajustes do ambiente de desenvolvimento estão disponíveis no documento:
+As instruções completas sobre:
+
+- instalação do Python
+- editor recomendado
+- extensões do VS Code
+- ajustes de ambiente no Windows
+
+estão disponíveis em:
 
 ➡️ **[Guia de Ambiente de Desenvolvimento](docs/development-environment.md)**
 
@@ -32,16 +69,18 @@ e ajustes do ambiente de desenvolvimento estão disponíveis no documento:
 
 ## ▶️ Como executar o projeto
 
-Para executar o projeto pela primeira vez no Windows, siga o passo a passo em:
+Para executar o projeto corretamente no Windows — incluindo:
+
+- criação da venv com Python 3.13
+- instalação do projeto em modo editável
+- execução do aplicativo
+- testes e debug
+
+consulte o guia oficial:
 
 ➡️ **[Run the App (Windows)](docs/run-the-app.md)**
 
-Esse guia cobre:
-
-- Criação e ativação da VENV
-- Instalação das dependências
-- Execução do aplicativo
-- Solução de problemas comuns
+Esse documento descreve o **fluxo suportado e validado** para este template.
 
 ---
 
@@ -51,24 +90,26 @@ A organização de pastas e arquivos do template é explicada em detalhes em:
 
 ➡️ **[Project Structure](docs/project-structure.md)**
 
-Esse documento ajuda a entender:
+Esse guia ajuda a entender:
 
-- Onde colocar cada tipo de código
-- Como a interface é organizada
-- Onde entram estado, logger, layout e páginas
-- Como o projeto pode crescer de forma organizada
+- onde cada tipo de código deve ficar
+- como a interface é organizada
+- como separar layout, páginas e infraestrutura
+- como o projeto pode crescer de forma sustentável
 
 ---
 
-## 📌 Próximos conteúdos (em evolução)
+## 📌 Próximas evoluções do template
 
-Este template será expandido gradualmente para incluir:
+Este template está em evolução contínua. Entre os próximos passos planejados estão:
 
-- Criação de novas páginas
-- Customização visual (CSS, ícones, imagens)
-- Uso como aplicação desktop nativa
-- Empacotamento do app em `.exe` no Windows
-- Boas práticas para projetos NiceGUI
+- exemplos adicionais de páginas e componentes
+- customização visual (CSS, ícones, imagens)
+- melhorias para uso como aplicação desktop nativa
+- empacotamento do aplicativo em `.exe` no Windows
+- consolidação de boas práticas para projetos NiceGUI
+
+A evolução ocorrerá de forma incremental, mantendo a base estável.
 
 ---
 
