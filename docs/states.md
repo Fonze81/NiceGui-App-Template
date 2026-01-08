@@ -2,7 +2,7 @@
 
 ## Visão Geral
 
-O módulo `state` define o **estado central da aplicação** em tempo de execução.  
+O módulo `state` define o **estado central da aplicação** em tempo de execução.
 Ele representa a **fonte única de verdade (Single Source of Truth)** para todos os
 parâmetros carregados a partir de configurações persistentes ou alterados pela UI.
 
@@ -25,12 +25,15 @@ Seu papel é **representar dados**, não interpretá-los.
 Os principais objetivos deste módulo são:
 
 1. **Desacoplamento**
+
    - Separar completamente dados em memória de I/O e frameworks externos.
 
 2. **Previsibilidade**
+
    - O estado deve ser simples, explícito e fácil de inspecionar em runtime.
 
 3. **Testabilidade**
+
    - Qualquer teste pode instanciar o estado sem mocks ou dependências externas.
 
 4. **Evolução controlada**
@@ -156,9 +159,7 @@ Evita injeção excessiva de dependências
 
 Mantém acesso explícito (não mágico)
 
-
 O singleton é lazy, ou seja, só é criado quando solicitado.
-
 
 ---
 
@@ -174,9 +175,7 @@ Aplica valores no AppState
 
 Persiste novamente apenas campos configuráveis
 
-
 O state não conhece o settings.
-
 
 ---
 
@@ -188,9 +187,7 @@ Realizam validação de entrada
 
 Aplicam alterações de volta ao AppState de forma explícita
 
-
 O state não conhece a UI.
-
 
 ---
 
@@ -202,8 +199,6 @@ A conversão para LogConfig ocorre em um módulo intermediário
 
 O state não conhece handlers, níveis internos nem rotação
 
-
-
 ---
 
 Regras de Evolução (Importantes)
@@ -212,16 +207,11 @@ Ao adicionar um novo campo persistente:
 
 1. Adicionar o campo no subestado apropriado em state.py
 
-
 2. Ler o campo em settings.apply_settings_to_state
-
 
 3. Persistir o campo em settings.build_raw_from_state
 
-
-
 Esse é um contrato explícito, adotado para manter controle total sobre persistência e compatibilidade.
-
 
 ---
 
@@ -237,9 +227,7 @@ Não acessar variáveis de ambiente
 
 Não importar NiceGUI ou bibliotecas externas
 
-
 Se alguma dessas necessidades surgir, ela pertence a outro módulo.
-
 
 ---
 
@@ -258,6 +246,5 @@ Desacoplado
 Testável
 
 Sustentável a longo prazo
-
 
 Qualquer complexidade adicional deve existir ao redor do estado, nunca dentro dele.

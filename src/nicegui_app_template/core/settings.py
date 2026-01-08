@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-# =============================================================================
+# -----------------------------------------------------------------------------
 # Settings (TOML) + Integração com Estado
-# =============================================================================
+# -----------------------------------------------------------------------------
 # Este módulo é responsável por:
 # - Ler settings.toml e aplicar os valores no AppState (estado em runtime)
 # - Persistir o AppState (somente a parte configurável) novamente em settings.toml
@@ -25,15 +25,24 @@ from __future__ import annotations
 import logging  # Logging é injetável e opcional; o módulo não deve depender do bootstrap do logger.
 import os  # Permite override de raiz do app via variável de ambiente para empacotamento/atalhos.
 import re  # Usado para parsing leve de tamanhos como "5 MB" para bytes.
-from pathlib import Path  # Path é o tipo padrão para caminhos, evitando strings frágeis em múltiplos SOs.
-from typing import Any, Mapping, Optional  # Tipos explícitos facilitam manutenção e testes.
+from pathlib import (
+    Path,
+)  # Path é o tipo padrão para caminhos, evitando strings frágeis em múltiplos SOs.
+from typing import (
+    Any,
+    Mapping,
+    Optional,
+)  # Tipos explícitos facilitam manutenção e testes.
 
-from .state import AppState, get_app_state  # O módulo aplica configurações diretamente no estado central.
+from .state import (
+    AppState,
+    get_app_state,
+)  # O módulo aplica configurações diretamente no estado central.
 
 
-# =============================================================================
+# -----------------------------------------------------------------------------
 # Compat TOML (Python 3.10+)
-# =============================================================================
+# -----------------------------------------------------------------------------
 # A leitura TOML precisa funcionar em 3.10 (tomli) e 3.11+ (tomllib).
 # A escrita TOML será feita por um serializador mínimo próprio (sem dependências).
 
@@ -65,11 +74,12 @@ def _loads_toml(text: str) -> dict[str, Any]:
     return tomli.loads(text)  # type: ignore[no-any-return]
 
 
-# =============================================================================
+# -----------------------------------------------------------------------------
 # Logger injetável com fallback silencioso
-# =============================================================================
+# -----------------------------------------------------------------------------
 # O módulo não deve falhar nem emitir prints se o logger ainda não estiver pronto.
 # Por isso, aceitamos um logger opcional e usamos um fallback silencioso.
+
 
 class _NullLogger(logging.Logger):
     """
@@ -90,9 +100,10 @@ def _get_logger(logger: Optional[logging.Logger]) -> logging.Logger:
     return logger if logger is not None else _NullLogger()
 
 
-# =============================================================================
+# -----------------------------------------------------------------------------
 # Helpers: resolução de caminhos e utilidades de parsing
-# =============================================================================
+# -----------------------------------------------------------------------------
+
 
 def _project_root_from_env() -> Path:
     """
@@ -174,9 +185,9 @@ def _atomic_write_text(file_path: Path, content: str) -> None:
     tmp_path.replace(file_path)
 
 
-# =============================================================================
+# -----------------------------------------------------------------------------
 # Serialização TOML mínima
-# =============================================================================
+# -----------------------------------------------------------------------------
 # Este serializador cobre apenas o necessário para o template:
 # - tabelas aninhadas [a] e [a.b]
 # - tipos escalares: str, int, float, bool
@@ -189,6 +200,7 @@ def _atomic_write_text(file_path: Path, content: str) -> None:
 # Limitação:
 # - Não preserva comentários nem ordem original
 # - Não suporta arrays e tipos especiais (datas etc.)
+
 
 def _to_toml_string(data: Mapping[str, Any]) -> str:
     """
@@ -207,11 +219,11 @@ def _to_toml_string(data: Mapping[str, Any]) -> str:
             return str(v)
         if isinstance(v, Path):
             # Converter Path para string é o boundary correto da persistência.
-            return f"\"{str(v).replace('\\\\', '/')}\""
+            return f'"{str(v).replace("\\\\", "/")}"'
         if isinstance(v, str):
             # Escape simples para manter string válida em TOML.
-            escaped = v.replace("\\", "\\\\").replace("\"", "\\\"")
-            return f"\"{escaped}\""
+            escaped = v.replace("\\", "\\\\").replace('"', '\\"')
+            return f'"{escaped}"'
         raise TypeError(f"Unsupported TOML value type: {type(v)}")
 
     lines: list[str] = []
@@ -259,9 +271,9 @@ def _to_toml_string(data: Mapping[str, Any]) -> str:
     return "\n".join(lines).lstrip("\n").rstrip() + "\n"
 
 
-# =============================================================================
+# -----------------------------------------------------------------------------
 # Aplicação ao Estado: TOML -> AppState
-# =============================================================================
+# -----------------------------------------------------------------------------
 # Nesta etapa, aplicamos:
 # - casting leve (int/bool/float/str)
 # - defaults do próprio estado
@@ -271,6 +283,7 @@ def _to_toml_string(data: Mapping[str, Any]) -> str:
 # - O estado não deve conter validações nem parsing
 # - Evitar travar o app por configuração inválida
 # - Garantir consistência mínima dos valores para consumo por UI e logger
+
 
 def apply_settings_to_state(state: AppState, raw: Mapping[str, Any]) -> None:
     """
@@ -287,7 +300,9 @@ def apply_settings_to_state(state: AppState, raw: Mapping[str, Any]) -> None:
     state.meta.version = str(_deep_get(raw, "app.version", state.meta.version))
     state.meta.language = str(_deep_get(raw, "app.language", state.meta.language))
     state.meta.first_run = bool(_deep_get(raw, "app.first_run", state.meta.first_run))
-    state.meta.native_mode = bool(_deep_get(raw, "app.native_mode", state.meta.native_mode))
+    state.meta.native_mode = bool(
+        _deep_get(raw, "app.native_mode", state.meta.native_mode)
+    )
     state.meta.port = int(_deep_get(raw, "app.port", state.meta.port))
 
     # Validação leve para porta; fallback mantém o app executável.
@@ -301,10 +316,18 @@ def apply_settings_to_state(state: AppState, raw: Mapping[str, Any]) -> None:
     state.window.y = int(_deep_get(raw, "app.window.y", state.window.y))
     state.window.width = int(_deep_get(raw, "app.window.width", state.window.width))
     state.window.height = int(_deep_get(raw, "app.window.height", state.window.height))
-    state.window.maximized = bool(_deep_get(raw, "app.window.maximized", state.window.maximized))
-    state.window.fullscreen = bool(_deep_get(raw, "app.window.fullscreen", state.window.fullscreen))
-    state.window.monitor = int(_deep_get(raw, "app.window.monitor", state.window.monitor))
-    state.window.storage_key = str(_deep_get(raw, "app.window.storage_key", state.window.storage_key))
+    state.window.maximized = bool(
+        _deep_get(raw, "app.window.maximized", state.window.maximized)
+    )
+    state.window.fullscreen = bool(
+        _deep_get(raw, "app.window.fullscreen", state.window.fullscreen)
+    )
+    state.window.monitor = int(
+        _deep_get(raw, "app.window.monitor", state.window.monitor)
+    )
+    state.window.storage_key = str(
+        _deep_get(raw, "app.window.storage_key", state.window.storage_key)
+    )
 
     # Tamanhos mínimos evitam UI inutilizável; valores podem ser ajustados depois.
     if state.window.width < 400:
@@ -316,9 +339,13 @@ def apply_settings_to_state(state: AppState, raw: Mapping[str, Any]) -> None:
     # UI
     # -------------------------
     state.ui.theme = str(_deep_get(raw, "app.ui.theme", state.ui.theme))
-    state.ui.font_scale = float(_deep_get(raw, "app.ui.font_scale", state.ui.font_scale))
+    state.ui.font_scale = float(
+        _deep_get(raw, "app.ui.font_scale", state.ui.font_scale)
+    )
     state.ui.dense_mode = bool(_deep_get(raw, "app.ui.dense_mode", state.ui.dense_mode))
-    state.ui.accent_color = str(_deep_get(raw, "app.ui.accent_color", state.ui.accent_color))
+    state.ui.accent_color = str(
+        _deep_get(raw, "app.ui.accent_color", state.ui.accent_color)
+    )
 
     # -------------------------
     # Logging
@@ -328,16 +355,22 @@ def apply_settings_to_state(state: AppState, raw: Mapping[str, Any]) -> None:
     state.log.path = Path(log_path)
 
     # level é mantido como string para facilitar UI e settings.
-    state.log.level = str(_deep_get(raw, "app.log.level", state.log.level)).upper().strip()
+    state.log.level = (
+        str(_deep_get(raw, "app.log.level", state.log.level)).upper().strip()
+    )
 
     # console é booleano simples.
     state.log.console = bool(_deep_get(raw, "app.log.console", state.log.console))
 
     # buffer_capacity define o tamanho do MemoryHandler no bootstrap do logger.
-    state.log.buffer_capacity = int(_deep_get(raw, "app.log.buffer_capacity", state.log.buffer_capacity))
+    state.log.buffer_capacity = int(
+        _deep_get(raw, "app.log.buffer_capacity", state.log.buffer_capacity)
+    )
 
     # rotation/retention são strings/ints amigáveis para humanos e mapeadas em outro módulo.
-    state.log.rotation = str(_deep_get(raw, "app.log.rotation", state.log.rotation)).strip()
+    state.log.rotation = str(
+        _deep_get(raw, "app.log.rotation", state.log.rotation)
+    ).strip()
     state.log.retention = int(_deep_get(raw, "app.log.retention", state.log.retention))
 
     # Validações leves: preferimos fallback a erro duro.
@@ -357,14 +390,17 @@ def apply_settings_to_state(state: AppState, raw: Mapping[str, Any]) -> None:
     # -------------------------
     # Behavior
     # -------------------------
-    state.behavior.auto_save = bool(_deep_get(raw, "app.behavior.auto_save", state.behavior.auto_save))
+    state.behavior.auto_save = bool(
+        _deep_get(raw, "app.behavior.auto_save", state.behavior.auto_save)
+    )
 
 
-# =============================================================================
+# -----------------------------------------------------------------------------
 # Construção: AppState -> dict TOML (somente persistente)
-# =============================================================================
+# -----------------------------------------------------------------------------
 # A persistência deve conter apenas campos de configuração, não flags de runtime
 # como last_error/last_load_ok. Isso evita "vazar" estados efêmeros para disco.
+
 
 def build_raw_from_state(state: AppState) -> dict[str, Any]:
     """
@@ -414,11 +450,12 @@ def build_raw_from_state(state: AppState) -> dict[str, Any]:
     }
 
 
-# =============================================================================
+# -----------------------------------------------------------------------------
 # API pública: load/save
-# =============================================================================
+# -----------------------------------------------------------------------------
 # A API retorna bool para facilitar bootstrap do app sem exceções no fluxo normal.
 # Em caso de falha, a causa é registrada em state.last_error.
+
 
 def load_settings(
     *,
@@ -485,7 +522,11 @@ def save_settings(
     st = state if state is not None else get_app_state()
 
     # O path pode vir explicitamente, do último load, ou do default do projeto.
-    path = (settings_path or st.settings_file_path or default_settings_path()).expanduser().resolve()
+    path = (
+        (settings_path or st.settings_file_path or default_settings_path())
+        .expanduser()
+        .resolve()
+    )
 
     st.settings_file_path = path
     st.last_error = None

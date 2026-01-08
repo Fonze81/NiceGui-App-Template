@@ -2,22 +2,29 @@
 
 from __future__ import annotations
 
-# =============================================================================
+# -----------------------------------------------------------------------------
 # Estado da Aplicação
-# =============================================================================
+# -----------------------------------------------------------------------------
 # Este módulo define o estado central do aplicativo de forma "pura".
 # "Puro" aqui significa: sem dependências de UI, sem leitura/escrita de arquivos,
 # sem acoplamento ao logger e sem regras de validação. Essa decisão mantém o
 # estado testável e reaproveitável em qualquer contexto de execução.
 
-from dataclasses import dataclass, field  # dataclasses reduzem boilerplate e deixam o estado explícito.
-from pathlib import Path  # Path é usado no core para representar caminhos de forma robusta no SO.
-from typing import Optional  # Optional explicita campos que podem não estar disponíveis em runtime.
+from dataclasses import (
+    dataclass,
+    field,
+)  # dataclasses reduzem boilerplate e deixam o estado explícito.
+from pathlib import (
+    Path,
+)  # Path é usado no core para representar caminhos de forma robusta no SO.
+from typing import (
+    Optional,
+)  # Optional explicita campos que podem não estar disponíveis em runtime.
 
 
-# =============================================================================
+# -----------------------------------------------------------------------------
 # Subestados — domínios lógicos do aplicativo
-# =============================================================================
+# -----------------------------------------------------------------------------
 # A separação em subestados evita um "Config" monolítico e favorece manutenção
 # incremental. Cada grupo concentra atributos com coesão forte (mesma motivação).
 
@@ -153,9 +160,9 @@ class BehaviorState:
     auto_save: bool = True
 
 
-# =============================================================================
+# -----------------------------------------------------------------------------
 # Estado Central — fonte de verdade em runtime
-# =============================================================================
+# -----------------------------------------------------------------------------
 # Esta estrutura agrega os subestados e adiciona campos de runtime para
 # diagnóstico (sucesso/erro de load/save). Esses campos não são persistência
 # por padrão: persistência é responsabilidade do módulo de settings.
@@ -205,9 +212,9 @@ class AppState:
     last_error: Optional[str] = None
 
 
-# =============================================================================
+# -----------------------------------------------------------------------------
 # Singleton pragmático
-# =============================================================================
+# -----------------------------------------------------------------------------
 # Justificativa:
 # - Em aplicações desktop é comum existir uma única instância de estado global
 # - Evita injeção excessiva de dependências em módulos pequenos
@@ -218,7 +225,9 @@ class AppState:
 # - Ele apenas fornece uma instância consistente para o processo
 
 
-_APP_STATE: Optional[AppState] = None  # Cache do estado global do processo; evita múltiplas instâncias acidentais.
+_APP_STATE: Optional[AppState] = (
+    None  # Cache do estado global do processo; evita múltiplas instâncias acidentais.
+)
 
 
 def get_app_state() -> AppState:
@@ -231,6 +240,10 @@ def get_app_state() -> AppState:
     - Manter previsibilidade do fluxo em um app desktop
     """
     global _APP_STATE  # O singleton é controlado por módulo para manter simplicidade e previsibilidade.
-    if _APP_STATE is None:  # Inicialização lazy para não impor custo antes de ser necessário.
-        _APP_STATE = AppState()  # Instância padrão; será populada pelo módulo settings em seguida.
+    if (
+        _APP_STATE is None
+    ):  # Inicialização lazy para não impor custo antes de ser necessário.
+        _APP_STATE = (
+            AppState()
+        )  # Instância padrão; será populada pelo módulo settings em seguida.
     return _APP_STATE  # Retorno da instância única para consumo por módulos do app.

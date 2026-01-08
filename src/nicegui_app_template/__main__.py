@@ -1,3 +1,5 @@
+# src/nicegui_app_template/__mains__.py
+
 from __future__ import annotations
 
 # -----------------------------------------------------------------------------
