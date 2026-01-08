@@ -18,8 +18,7 @@ utilizando **NiceGUI** com Python, com **foco técnico exclusivo no Windows**.
 
 ⚠️ **Status do projeto:**
 
-> **Em desenvolvimento ativo** - a estrutura principal está definida, mas o template
-> continuará evoluindo com novos exemplos, boas práticas e recursos.
+> Este template encontra-se em estágio **alpha**, sujeito a mudanças estruturais sem aviso prévio.
 
 O objetivo é facilitar o início de novos projetos, oferecendo uma base **organizada,
 padronizada e fácil de entender**, preparada principalmente para **aplicações desktop
