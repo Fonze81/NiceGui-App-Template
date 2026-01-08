@@ -11,14 +11,15 @@ e começar a desenvolver imediatamente**, com o mínimo de configuração manual
 
 ## 📌 Premissas do Ambiente
 
-Este template assume:
+Este template **adota como padrão técnico**:
 
 - Desenvolvimento focado em **Windows**
-- Uso de **Python 3.13**
-- Projeto executado sempre dentro de uma **virtual environment**
-- Editor principal: **Visual Studio Code**
+- **Python 3.13 obrigatório** (restrição técnica do projeto)
+- Execução do projeto sempre dentro de uma **virtual environment**
+- **Visual Studio Code** como editor principal recomendado
 
-Essas premissas são aplicadas automaticamente sempre que possível.
+Essas decisões fazem parte do design do template e **não são opcionais**,
+salvo indicação explícita em documentação futura.
 
 ---
 
