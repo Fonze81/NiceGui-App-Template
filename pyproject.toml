@@ -6,13 +6,11 @@ build-backend = "setuptools.build_meta"
 name = "nicegui-app-template"
 version = "0.1.0"
 description = "NiceGUI app template (Windows-first)"
-requires-python = ">=3.13"
-dependencies = [
-  "nicegui",
-]
+requires-python = "==3.13.*"
+dependencies = ["nicegui>=3.4"]
 
 [tool.setuptools]
-package-dir = {"" = "src"}
+package-dir = { "" = "src" }
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -20,3 +18,7 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+
+[tool.ruff]
+target-version = "py313"
+line-length = 88
