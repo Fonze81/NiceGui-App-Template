@@ -1,12 +1,17 @@
 # NiceGui-App-Template
 
 ![Status](https://img.shields.io/badge/status-alpha-orange)
-![Version](https://img.shields.io/badge/version-0.1.0a1-orange)
-![Python](https://img.shields.io/badge/python-3.13-blue)
-![Platform](https://img.shields.io/badge/platform-Windows-blue)
-![NiceGUI](https://img.shields.io/badge/framework-NiceGUI-009688)
+![Version](https://img.shields.io/github/v/release/Fonze81/NiceGui-App-Template?include_prereleases)
+
+![Python](https://img.shields.io/badge/python-3.13%20only-blue)
+![Platform](https://img.shields.io/badge/platform-Windows--first-blue)
+![NiceGUI](https://img.shields.io/badge/NiceGUI-3.4+-green)
+
+![Layout](https://img.shields.io/badge/layout-src--layout-informational)
 ![Code Style](https://img.shields.io/badge/code%20style-ruff-black)
 ![Tests](https://img.shields.io/badge/tests-pytest-green)
+
+![License](https://img.shields.io/badge/license-MIT-blue)
 
 Este repositório é um **template inicial para criação de aplicações desktop ou web**
 utilizando **NiceGUI** com Python, com **foco técnico exclusivo no Windows**.
