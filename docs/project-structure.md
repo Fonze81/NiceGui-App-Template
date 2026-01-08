@@ -5,44 +5,45 @@ Este documento descreve a **estrutura atual do repositório**
 
 A estrutura foi pensada para:
 
-- funcionar corretamente no Windows
-- suportar `src` layout sem hacks
-- permitir execução, debug e testes de forma consistente
-- crescer de forma controlada
+- funcionar corretamente no **Windows**
+- suportar **`src` layout** sem hacks
+- permitir **execução, debug e testes** de forma consistente
+- crescer de forma controlada e sustentável
 
 ---
 
 ## Visão geral
 
-```
-
+```text
 NiceGui-App-Template/
-├─ .vscode/
-├─ docs/
 ├─ assets/
+├─ docs/
 ├─ src/
 ├─ tests/
 ├─ pyproject.toml
 ├─ requirements.txt
 └─ README.md
-
 ```
 
 ---
 
 ## 📁 `.vscode/`
 
-Configurações do **Visual Studio Code** para padronizar o ambiente.
+Configurações do **Visual Studio Code** para padronizar o ambiente de desenvolvimento.
+
+Arquivos incluídos:
 
 - `extensions.json`
-  Extensões recomendadas para o projeto.
+  Lista de extensões recomendadas para o projeto.
 
 - `settings.json`
-  Ajustes do editor (Python, Ruff, formatação, etc.).
+  Ajustes do editor (Python, Ruff, formatação, testes, etc.).
 
 - `launch.json`
   Configuração de debug que executa o aplicativo como **módulo**
   (`python -m nicegui_app_template`).
+
+Esses arquivos evitam configuração manual e garantem consistência entre máquinas.
 
 ---
 
@@ -50,14 +51,25 @@ Configurações do **Visual Studio Code** para padronizar o ambiente.
 
 Documentação do projeto.
 
+Arquivos principais:
+
 - `development-environment.md`
   Como preparar o ambiente de desenvolvimento no Windows.
 
 - `run-the-app.md`
-  Como executar, debugar e testar o aplicativo usando `src` layout.
+  Como criar a venv, instalar dependências, executar, debugar e testar o app.
 
 - `project-structure.md`
   Este documento.
+
+- `logger.md`
+  Documentação do sistema de logging.
+
+- `settings.md`
+  Documentação do módulo de settings.
+
+- `states.md`
+  Documentação do estado da aplicação.
 
 ---
 
@@ -66,7 +78,7 @@ Documentação do projeto.
 Arquivos estáticos e recursos visuais.
 
 - `assets/css/`
-  CSS global e customizações futuras.
+  CSS global e customizações visuais.
 
 - `assets/icons/`
   Ícones do aplicativo (ex.: `.ico` para Windows).
@@ -74,32 +86,42 @@ Arquivos estáticos e recursos visuais.
 - `assets/images/`
   Imagens gerais (logos, screenshots, etc.).
 
+Esses arquivos não contêm lógica Python.
+
 ---
 
 ## 📁 `src/`
 
 Todo o código Python do projeto fica dentro da pasta `src`.
-Este padrão evita imports acidentais e prepara o projeto para empacotamento.
 
-### 📦 `src/nicegui_app_template/`
+Esse padrão:
+
+- evita imports acidentais
+- elimina dependência de `PYTHONPATH`
+- prepara o projeto para empacotamento
+- reflete o uso real do pacote em produção
+
+---
+
+## 📦 `src/nicegui_app_template/`
 
 Pacote principal da aplicação.
 
-```
-
+```text
 src/nicegui_app_template/
-├─ **init**.py
-├─ **main**.py
 ├─ app.py
-└─ ui/
-├─ **init**.py
-└─ index.py
-
+├─ __main__.py
+├─ core/
+├─ services/
+├─ ui/
+└─ utils/
 ```
+
+---
 
 ### `__main__.py`
 
-Permite executar o aplicativo como módulo:
+Permite executar o aplicativo como **módulo Python**:
 
 ```powershell
 python -m nicegui_app_template
@@ -107,36 +129,106 @@ python -m nicegui_app_template
 
 Este é o **modo correto** de execução em projetos com `src` layout.
 
+O arquivo é propositalmente pequeno e apenas delega para `app.main()`.
+
 ---
 
 ### `app.py`
 
 Ponto de entrada lógico do aplicativo.
 
-Responsabilidades atuais:
+Responsabilidades:
 
-- conter a função `main()`
-- chamar a montagem da UI
-- incluir funções simples de exemplo (ex.: `add`) para validação de testes
+- definir a função `main()`
+- inicializar logger e estado
+- carregar settings
+- montar a UI
+- iniciar o servidor NiceGUI
 
-Neste estágio, o arquivo é mantido propositalmente simples.
+Este arquivo coordena o bootstrap do app, mas não contém lógica de negócio.
 
 ---
 
-### `ui/index.py`
+## 📁 `core/`
 
-Responsável por montar a interface do usuário.
+Infraestrutura central do aplicativo.
 
-Atualmente contém:
+- `logger.py`
+  Sistema de logging com buffer em memória, rotação de arquivos e shutdown limpo.
 
-- um Hello World básico com NiceGUI
+- `settings.py`
+  Leitura, escrita e aplicação de configurações via `settings.toml`.
 
-No futuro, este módulo evolui para:
+- `state.py`
+  Estado central da aplicação, implementado como dataclasses puras.
 
-- layout
-- páginas
-- navegação
-- temas
+Esses módulos não dependem da UI.
+
+---
+
+## 📁 `ui/`
+
+Camada de interface do usuário (NiceGUI).
+
+```text
+ui/
+├─ index.py
+├─ layout/
+├─ pages/
+└─ theme/
+```
+
+- `index.py`
+  Monta o layout principal e registra páginas.
+
+### `layout/`
+
+Componentes estruturais reutilizáveis:
+
+- navbar
+- drawer
+- footer
+- menu
+
+### `pages/`
+
+Páginas da aplicação:
+
+- home
+- hello
+- about
+
+### `theme/`
+
+Customizações visuais:
+
+- assets
+- CSS customizado
+- integração com o tema do NiceGUI
+
+---
+
+## 📁 `services/`
+
+Camada reservada para **serviços e integrações externas**.
+
+Exemplos futuros:
+
+- integração com SAP
+- acesso a banco de dados
+- chamadas REST
+- automações
+
+Atualmente pode estar vazia ou conter apenas documentação.
+
+---
+
+## 📁 `utils/`
+
+Utilitários auxiliares e código de apoio.
+
+- `window_state.py`
+  Persistência e restauração do estado da janela (posição, tamanho, monitor).
 
 ---
 
@@ -144,43 +236,25 @@ No futuro, este módulo evolui para:
 
 Testes automatizados usando **pytest**.
 
-```
+```text
 tests/
-├─ test_smoke.py
-└─ test_math.py
+└─ core/
+   ├─ test_logger.py
+   ├─ test_settings.py
+   └─ test_state.py
 ```
 
-### Características importantes
+Características importantes:
 
-- Não existe `conftest.py`
 - Não há manipulação manual de `sys.path`
 - Os testes dependem do projeto estar instalado em modo editável
+- O layout de testes reflete a estrutura real do código
 
-Isso é intencional e garante que:
+Isso garante que:
 
-- os testes refletem o uso real do pacote
+- os testes simulam o uso real do pacote
 - erros de import não sejam mascarados
-
----
-
-### `test_smoke.py`
-
-Teste de fumaça simples para validar:
-
-- imports do pacote
-- estrutura básica do projeto
-
----
-
-### `test_math.py`
-
-Teste propositalmente simples para validar:
-
-- funcionamento do pytest
-- descoberta de testes
-- imports corretos no `src` layout
-
-Usa uma função pura (`add`) definida em `app.py`.
+- o projeto permaneça saudável ao crescer
 
 ---
 
@@ -192,11 +266,13 @@ Responsável por:
 
 - definir o pacote Python
 - configurar o `src` layout
-- permitir instalação editável (`pip install -e .`)
+- definir dependências
 - configurar o pytest
+- configurar o Ruff
 
 Este arquivo é essencial para que:
 
+- `pip install -e .` funcione
 - `python -m nicegui_app_template` funcione
 - debug no VS Code funcione
 - pytest funcione sem hacks
@@ -215,9 +291,8 @@ pytest
 
 Essa estrutura:
 
-- evita ajustes manuais de PYTHONPATH
+- evita ajustes manuais de `PYTHONPATH`
 - facilita debug
-- prepara o projeto para crescer
+- melhora testabilidade
+- prepara o projeto para longo prazo
 - reduz problemas para iniciantes
-
----
