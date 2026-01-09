@@ -5,122 +5,107 @@ from __future__ import annotations
 # -----------------------------------------------------------------------------
 # Módulo de entrada do aplicativo
 # -----------------------------------------------------------------------------
-# Este módulo define o ponto de entrada lógico do aplicativo.
+# Este módulo é o ponto de entrada da aplicação.
 #
-# Objetivos principais:
-# - Demonstrar o ciclo de vida completo do sistema de logging
-# - Garantir que mensagens sejam efetivamente gravadas em arquivo no Windows
-# - Servir como base simples e previsível para evolução futura do app
+# Responsabilidades deste arquivo:
+# - Orquestrar o ciclo de vida do logger (bootstrap → update → enable → shutdown)
+# - Carregar configurações persistentes (settings.toml)
+# - Resolver configurações humanas do estado em valores técnicos
+# - Garantir que falhas não interrompam o bootstrap da aplicação
 #
-# Problema comum em exemplos simples de logging:
-# - O arquivo de log é criado, mas permanece vazio
-#
-# Causas frequentes:
-# - O processo termina logo após habilitar o handler de arquivo
-# - Não há nenhuma mensagem registrada após a ativação do handler
-# - Handlers não são fechados corretamente (especialmente no Windows)
-#
-# Decisão adotada neste template:
-# - Habilitar explicitamente o logging em arquivo com path conhecido
-# - Registrar mensagens antes e depois da ativação do arquivo
-# - Garantir shutdown em bloco finally para flush e fechamento dos handlers
+# Decisões arquiteturais:
+# - Nenhuma lógica de negócio deve residir aqui
+# - Nenhuma configuração é parseada manualmente
+# - O estado é tratado como fonte de verdade em runtime
+# - Conversões técnicas são delegadas a resolvers explícitos
 # -----------------------------------------------------------------------------
 
-# -----------------------------------------------------------------------------
-# Imports
-# -----------------------------------------------------------------------------
-import logging  # Usado apenas para constantes de nível (DEBUG, INFO, etc.)
-from pathlib import Path  # Representação robusta de caminhos de arquivo
-
-from .core.logger import LogConfig, create_bootstrapper, get_logger
-
-# -----------------------------------------------------------------------------
-# Função principal
-# -----------------------------------------------------------------------------
+from .core.logger import create_bootstrapper, get_logger
+from .core.logger_resolver import resolve_log_config_from_state
+from .core.settings import load_settings
+from .core.state import get_app_state
 
 
 def main() -> None:
     """
-    Inicializa o sistema de logging e registra mensagens de exemplo.
+    Inicializa e orquestra o bootstrap da aplicação.
 
-    Esta função é propositalmente simples e síncrona para:
-    - facilitar validação em ambiente Windows
-    - evitar dependências de UI neste estágio
-    - servir como base clara para o bootstrap do aplicativo
+    Esta função executa a sequência completa de inicialização do aplicativo,
+    garantindo que:
+    - O logger seja iniciado em modo buffered
+    - As configurações persistentes sejam carregadas no estado
+    - A configuração técnica do logger seja resolvida a partir do estado
+    - O logging em arquivo seja habilitado de forma segura
+    - Recursos do logger sejam finalizados corretamente ao final
+
+    A função não retorna valores e não lança exceções intencionalmente,
+    permitindo que o aplicativo siga com defaults mesmo em cenários de falha.
     """
-    # Definição explícita do caminho do arquivo de log.
-    #
-    # Motivo:
-    # - Evita ambiguidades sobre onde o log será gravado
-    # - Facilita debug e inspeção manual durante desenvolvimento
-    log_file_path = Path("logs/app.log")
 
-    # Construção da configuração do logger.
-    #
-    # Decisões:
-    # - Nome fixo do logger raiz do aplicativo
-    # - Nível DEBUG para máxima visibilidade durante desenvolvimento
-    # - Console habilitado para feedback imediato
-    log_config = LogConfig(
-        name="nicegui_app_template",
-        file_path=log_file_path,
-        level=logging.DEBUG,
-        console=True,
-    )
-
-    # Criação do bootstrapper responsável por gerenciar o ciclo de vida do logging.
-    #
-    # Responsabilidades do bootstrapper:
-    # - Inicializar handlers iniciais (console + buffer em memória)
-    # - Ativar o logging em arquivo quando solicitado
-    # - Garantir flush e fechamento correto dos handlers no shutdown
-    logger_bootstrapper = create_bootstrapper(log_config)
-
-    # Inicializa o logging básico (console + buffer em memória).
-    #
-    # Motivo:
-    # - Capturar mensagens emitidas logo no início da execução
-    # - Evitar perda de logs antes da ativação do arquivo
+    # -------------------------------------------------------------------------
+    # Bootstrap inicial do logger (modo buffer)
+    # -------------------------------------------------------------------------
+    # O logger é inicializado antes de qualquer outra operação para capturar
+    # mensagens iniciais, mesmo antes do caminho de arquivo estar resolvido.
+    logger_bootstrapper = create_bootstrapper()
     logger_bootstrapper.bootstrap()
-
-    # Recupera o logger raiz do aplicativo.
-    #
-    # Observação:
-    # - Todos os módulos devem obter loggers filhos a partir deste logger raiz
     log = get_logger()
 
+    # -------------------------------------------------------------------------
+    # Inicialização do estado da aplicação
+    # -------------------------------------------------------------------------
+    # O estado central é obtido como fonte única de verdade em runtime.
+    state = get_app_state()
+
+    # -------------------------------------------------------------------------
+    # Carregamento das configurações persistentes
+    # -------------------------------------------------------------------------
+    # Passar explicitamente state e logger evita uso de logger nulo e melhora
+    # rastreabilidade em caso de falha no carregamento.
+    load_ok = load_settings(state=state, logger=log)
+
+    if load_ok:
+        log.info("Settings loaded successfully")
+    else:
+        # O load_settings já registra o erro detalhado; aqui apenas explicitamos
+        # que o aplicativo seguirá com valores default.
+        log.warning("Settings load failed; defaults are being used")
+
+    # -------------------------------------------------------------------------
+    # Resolução da configuração técnica do logger
+    # -------------------------------------------------------------------------
+    # Converte valores humanos do estado (ex.: 'INFO', '5 MB') em valores técnicos
+    # exigidos pelo sistema de logging do Python.
+    log_config = resolve_log_config_from_state(state)
+    logger_bootstrapper.update_config(log_config)
+
     try:
-        # Mensagem registrada antes da ativação do logging em arquivo.
-        #
-        # Esperado:
-        # - Esta mensagem fica temporariamente no buffer em memória
+        # ---------------------------------------------------------------------
+        # Ativação do logging em arquivo
+        # ---------------------------------------------------------------------
+        # A partir deste ponto, o logger tenta persistir mensagens em disco.
         log.debug("Application starting (buffered)")
 
-        # Ativação explícita do logging em arquivo.
-        #
-        # Decisão:
-        # - Passar o file_path explicitamente evita depender de defaults implícitos
-        logger_bootstrapper.enable_file_logging(file_path=log_file_path)
+        try:
+            logger_bootstrapper.enable_file_logging()
+            log.info("File logging is active")
+        except Exception:
+            # Falhas aqui costumam estar relacionadas a permissões ou paths
+            # inválidos. A aplicação não deve quebrar por isso.
+            log.exception("Failed to enable file logging")
 
-        # Mensagem registrada após a ativação do arquivo.
-        #
-        # Esperado:
-        # - Esta mensagem deve ser escrita diretamente no arquivo de log
-        log.error("File logging is active (should be written to disk)")
-
+        # ---------------------------------------------------------------------
+        # Bootstrap real da aplicação (UI, rotas, serviços, etc.)
+        # ---------------------------------------------------------------------
+        # Este é o ponto onde a inicialização do NiceGUI ou outros subsistemas
+        # deve ocorrer. Mantido fora deste exemplo por clareza.
     finally:
-        # Encerramento explícito do sistema de logging.
-        #
-        # Motivo:
-        # - Forçar flush dos buffers
-        # - Fechar handlers corretamente
-        # - Evitar arquivos vazios ou bloqueados no Windows
+        # ---------------------------------------------------------------------
+        # Finalização controlada do logger
+        # ---------------------------------------------------------------------
+        # Garante flush de buffers e liberação correta de handlers.
         logger_bootstrapper.shutdown()
 
-
-# -----------------------------------------------------------------------------
-# Execução direta
-# -----------------------------------------------------------------------------
 
 if __name__ == "__main__":
     main()
