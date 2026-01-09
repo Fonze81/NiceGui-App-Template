@@ -1,170 +1,183 @@
 # Logger – NiceGUI App Template
 
 Este documento descreve o módulo de logging do **NiceGUI App Template**, incluindo
-objetivos, arquitetura, fluxo de execução e boas práticas de uso.
+objetivos, arquitetura, lifecycle, fluxo de execução, contratos explícitos e boas práticas de uso.
 
-O logger foi projetado para ser **robusto, didático e previsível**, mesmo para
-desenvolvedores iniciantes.
+O logger foi projetado para ser **robusto, previsível, didático e totalmente testável**,
+atendendo tanto iniciantes quanto aplicações de longo prazo em produção.
 
----
-
-## Objetivos do Logger
+## 🎯 Objetivos do Logger
 
 O módulo de logger resolve problemas comuns encontrados em aplicações desktop e web:
 
-- Registrar logs desde o início da execução do aplicativo
+- Registrar logs desde o início da execução do aplicativo (**early logging**)
 - Evitar perda de mensagens antes do arquivo de log existir
 - Centralizar logs em um único logger raiz
-- Evitar duplicação de handlers (idempotência)
+- Garantir **idempotência** (sem duplicação de handlers)
 - Evitar arquivos de log bloqueados no Windows
 - Facilitar diagnóstico com logs internos em nível DEBUG
+- Permitir reconfiguração segura após leitura de settings
 - Ser fácil de testar com pytest, sem flakiness
+- Ter lifecycle explícito e previsível
 
----
-
-## Conceitos Importantes
+## 🧠 Conceitos Importantes
 
 ### Logger Raiz do Aplicativo
 
 - Existe **um único logger raiz**, definido por `LogConfig.name`
-- Todos os módulos usam loggers filhos (`get_logger(__name__)`)
-- Loggers filhos **propagam** mensagens para o logger raiz
-- O logger raiz **não propaga** para o root logger do Python
+- Todos os módulos utilizam **loggers filhos** (`get_logger(__name__)`)
+- Loggers filhos **propagam mensagens** para o logger raiz
+- O logger raiz **não propaga** para o root logger global do Python
 
 Isso evita:
 
 - Logs duplicados
-- Interferência com logging global de bibliotecas externas
+- Interferência com bibliotecas externas
+- Dependência de `logging.basicConfig()`
 
----
+Este contrato é **validado por testes automatizados**.
 
-### Buffer em Memória
+### 🛡️ Segurança Antes do Bootstrap (NullHandler)
 
-Antes do arquivo de log estar disponível, as mensagens são armazenadas em memória.
+Antes da inicialização do logger:
 
-Motivo:
+- `get_logger()` pode ser chamado com segurança
+- Um `NullHandler` é anexado automaticamente
+- Nenhum warning do módulo `logging` é emitido
+- O logger raiz não propaga para o root logger global
 
-- Muitas aplicações só sabem o caminho do log após carregar configurações
+Isso garante que chamadas de logging **nunca quebram o aplicativo**, mesmo antes
+do bootstrap.
+
+### 📦 Buffer em Memória (Early Logging)
+
+Antes do arquivo de log estar disponível, mensagens são armazenadas em memória
+por meio de um `MemoryHandler`.
+
+Motivação:
+
+- O caminho do log geralmente depende de settings carregados depois
 - Sem buffer, logs iniciais seriam perdidos
 
-Quando o arquivo é habilitado:
+Quando o arquivo é ativado:
 
 - O buffer é descarregado no arquivo
 - O handler de buffer é removido
+- O logger passa a escrever diretamente em disco
 
----
+Comportamento **determinístico e coberto por testes**.
 
-### Idempotência
+### 🔁 Idempotência
 
-Idempotência significa que **chamar a mesma função várias vezes não muda o resultado final**.
+Idempotência significa que **chamar uma função várias vezes não altera o estado final**.
 
 No logger:
 
-- `bootstrap` não adiciona handlers duplicados
-- `enable_file_logging` não cria múltiplos handlers de arquivo
-- Isso evita logs repetidos e crescimento descontrolado do arquivo
+- `bootstrap()` não duplica handlers
+- `enable_file_logging()` não cria múltiplos handlers de arquivo
+- `update_config()` não duplica handlers
+- `shutdown()` não tenta fechar handlers inexistentes
 
----
+Isso evita:
 
-### Flakiness
+- Logs duplicados
+- Crescimento descontrolado de arquivos
+- Estados inconsistentes difíceis de depurar
 
-Flakiness ocorre quando testes:
+### 🔧 Reconfiguração Controlada (`update_config`)
 
-- Passam às vezes
-- Falham às vezes, sem mudança no código
+Após o bootstrap, o logger pode ser ajustado com segurança.
 
-Causas comuns em logging:
+`update_config()` **faz**:
 
-- Buffer não descarregado antes da leitura
-- Rotação de arquivo
-- Locks de arquivo no Windows
+- Atualiza nível do logger raiz
+- Atualiza nível dos handlers existentes
+- Anexa ou remove console conforme configuração
+- Mantém o nome do logger raiz imutável
 
-Mitigações aplicadas:
+`update_config()` **não faz**:
 
-- Flush explícito nos handlers
-- Shutdown garantido
-- Leitura de arquivos rotacionados (`.log`, `.log.1`, `.log.2`) nos testes
+- Não cria buffer em memória
+- Não ativa escrita em arquivo
+- Não altera o lifecycle
 
----
+Isso mantém separação clara entre:
 
-## Fluxo de Execução do Logger
+- Inicialização
+- Configuração
+- Persistência
 
-### Visão Geral
+## 🔁 Lifecycle do Logger — Diagrama Detalhado por Fase
 
 ```mermaid
 flowchart TD
-    A[Aplicação inicia] --> B[Inicialização do logger]
-    B --> C[Console handler]
-    B --> D[Buffer em memória]
-    D -->|Logs iniciais| D
-    B --> E[Ativação do arquivo de log]
-    E --> F[Handler de arquivo com rotação]
-    D -->|Flush do buffer| F
-    F --> G[Arquivo de log]
-    G --> H[Encerramento do logger]
-    H --> I[Handlers fechados]
+
+    %% Inicializacao da aplicacao
+    A[Aplicacao inicia] --> B[get_logger chamado]
+    B --> C[NullHandler anexado]
+    C --> D[Logger seguro sem warnings]
+
+    %% Bootstrap
+    D --> E[bootstrap]
+    E --> F[Anexar MemoryHandler]
+    E --> G[Anexar Console se habilitado]
+    F --> H[Logs iniciais em memoria]
+    G --> H
+    E --> I[DEBUG Logger bootstrap started]
+    E --> J[DEBUG Logger bootstrap completed]
+
+    %% Reconfiguracao apos settings
+    J --> K[update_config]
+    K --> L[Atualizar nivel do logger]
+    K --> M[Atualizar nivel dos handlers]
+    K --> N[Anexar ou remover console]
+    K --> O[Nome do logger permanece fixo]
+
+    %% Ativacao do arquivo de log
+    O --> P[enable_file_logging]
+    P --> Q{Bootstrap ja ocorreu}
+    Q -- Nao --> E
+    Q -- Sim --> R[Criar RotatingFileHandler]
+    R --> S[Conectar buffer ao arquivo]
+    S --> T[Flush do MemoryHandler]
+    T --> U[Remover MemoryHandler]
+    R --> V[DEBUG File handler attached]
+    P --> W[INFO File logging enabled]
+
+    %% Execucao normal
+    W --> X[Execucao do aplicativo]
+    X --> Y[Logs escritos direto em disco]
+    Y --> Y
+
+    %% Shutdown
+    Y --> Z[shutdown]
+    Z --> Z1[DEBUG Logger shutdown started]
+    Z1 --> Z2[DEBUG Logger shutdown completed]
+    Z2 --> Z3[Flush handlers gerenciados]
+    Z3 --> Z4[Fechar Memory Console File]
+    Z4 --> Z5[Logger encerrado com seguranca]
 ```
 
----
+## 🐞 Logs Internos de DEBUG
 
-### Passo a Passo
-
-#### 1. Inicialização do logger
-
-- Define nível do logger raiz
-- Anexa buffer em memória
-- Anexa console (se habilitado)
-- Registra logs internos em DEBUG:
-
-  - `Logger bootstrap started`
-  - `Logger bootstrap completed`
-
-#### 2. Ativação do arquivo de log
-
-- Garante que a inicialização já ocorreu
-- Cria handler de arquivo com rotação
-- Faz flush do buffer em memória
-- Remove o handler de buffer
-- Registra logs internos em DEBUG:
-
-  - `Enabling file logging`
-  - `File handler attached`
-  - `File logging enabled: <path>`
-
-#### 3. Encerramento do logger
-
-- Registra início do encerramento
-- Faz flush explícito
-- Fecha handlers de memória e arquivo
-- Registra finalização:
-
-  - `Logger shutdown completed`
-
-A mensagem **“shutdown completed” é emitida antes de fechar o arquivo**, garantindo
-que ela apareça no log.
-
----
-
-## Logs Internos de DEBUG
-
-O próprio módulo de logger gera mensagens em nível DEBUG para facilitar diagnóstico.
+O próprio módulo de logger gera mensagens internas em nível DEBUG para diagnóstico.
 
 Exemplos:
 
 - `Logger bootstrap started`
 - `Console handler attached`
+- `Enabling file logging`
 - `Flushing memory buffer to file`
-- `Closing file handler`
+- `File handler attached`
 - `Logger shutdown completed`
 
-Essas mensagens:
+Características:
 
 - Só aparecem quando `LogConfig.level = logging.DEBUG`
-- São usadas principalmente para troubleshooting e testes
+- São usadas extensivamente nos testes
+- Facilitam troubleshooting sem instrumentação externa
 
----
-
-## Uso Básico no Aplicativo
+## ▶️ Uso Básico no Aplicativo
 
 ```python
 from pathlib import Path
@@ -191,41 +204,41 @@ log.debug("This will appear in the log file")
 bootstrapper.shutdown()
 ```
 
----
+## ✅ Boas Práticas
 
-## Boas Práticas
-
-- Chame `bootstrap` o mais cedo possível
+- Chame `bootstrap()` o mais cedo possível
+- Use `get_logger(__name__)` em todos os módulos
 - Ative o arquivo de log assim que o caminho estiver disponível
-- Chame `shutdown` ao encerrar o app (ou registre em evento de shutdown)
-- Use `get_logger(__name__)` nos módulos
-- Use `get_logger()` apenas no ponto de entrada principal
+- Use `update_config()` apenas após o bootstrap
+- Chame `shutdown()` no encerramento do aplicativo
+- Não use `logging.basicConfig()`
+- Confie nos testes para validar o comportamento
 
----
+## 🧪 Testes Automatizados
 
-## Testes Automatizados
+O módulo de logging possui cobertura extensa para:
 
-O logger possui cobertura de testes para:
-
-- Propagação correta de loggers
-- Buffer em memória
-- Idempotência
+- Segurança antes do bootstrap (`NullHandler`)
+- Propagação correta de loggers filhos
+- Buffer em memória e flush correto
+- Idempotência do lifecycle
+- Reconfiguração de console e níveis
+- Defesa contra uso fora de ordem
 - Rotação de arquivos
-- Logs internos de DEBUG
 - Shutdown seguro no Windows
+- Preservação de handlers externos
 
-Esses testes evitam regressões silenciosas e garantem previsibilidade.
+Esses testes reduzem regressões silenciosas e garantem previsibilidade.
 
----
-
-## Conclusão
+## 🏁 Conclusão
 
 Este logger foi projetado para:
 
 - Ser compreensível por iniciantes
+- Ser previsível para arquitetos
 - Ser confiável em produção
 - Ser testável sem hacks
 - Ser seguro em ambientes Windows
 
-Ele pode ser usado como base para aplicações NiceGUI maiores
-ou como referência didática para aprendizado de logging em Python.
+Ele serve como **base sólida para aplicações NiceGUI**
+e como **referência didática de logging profissional em Python**.
