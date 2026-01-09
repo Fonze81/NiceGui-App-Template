@@ -6,15 +6,18 @@ from __future__ import annotations
 # Testes do módulo de estado (core/state.py)
 # -----------------------------------------------------------------------------
 # Estes testes validam:
-# - valores padrão dos dataclasses de estado
-# - composição do AppState (subestados corretos e independentes)
-# - comportamento do singleton get_app_state (lazy + cache)
-# - garantias de imutabilidade estrutural via slots (sem atributos dinâmicos)
+# - Valores padrão dos dataclasses de estado
+# - Composição do AppState (subestados corretos e independentes)
+# - Comportamento do singleton get_app_state (lazy + cache)
+# - Garantias de integridade estrutural via slots (sem atributos dinâmicos)
 #
-# Decisão: os testes importam o módulo como `state_module` para facilitar o acesso
-# a símbolos internos (ex.: _APP_STATE) quando necessário para isolar cenários.
+# Decisão:
+# - Os testes importam o módulo como `state_module` para acessar símbolos internos
+#   necessários para isolar cenários (ex.: _APP_STATE) sem expor essa mecânica
+#   no código de produção.
 # -----------------------------------------------------------------------------
 
+import re
 from pathlib import Path
 
 import pytest
@@ -26,14 +29,13 @@ from nicegui_app_template.core import state as state_module
 # Helpers
 # -----------------------------------------------------------------------------
 def _reset_singleton() -> None:
-    """
-    Reseta o singleton do módulo para garantir isolamento entre testes.
+    """Reseta o singleton do módulo para garantir isolamento entre testes.
 
     Como o estado é cacheado em nível de módulo, um teste pode influenciar outro
     se o singleton já estiver inicializado. Ao zerar o cache explicitamente,
     garantimos que cada teste parta de um baseline previsível.
     """
-    # Este acesso é intencional: estamos testando o contrato público (`get_app_state`)
+    # Este acesso é intencional: estamos testando o contrato público (`get_app_state`),
     # mas precisamos controlar o cache interno para assegurar isolamento entre casos.
     state_module._APP_STATE = None  # type: ignore[attr-defined]
 
@@ -43,11 +45,10 @@ def _reset_singleton() -> None:
 # -----------------------------------------------------------------------------
 @pytest.fixture(autouse=True)
 def reset_singleton_between_tests() -> None:
-    """
-    Garante que cada teste rode com singleton limpo.
+    """Garante que cada teste rode com singleton limpo.
 
-    Usar autouse evita repetição de boilerplate em todos os testes e reduz o
-    risco de esquecer o reset em cenários específicos.
+    Usar autouse evita repetição de boilerplate e reduz o risco de esquecer o reset
+    em cenários específicos.
     """
     _reset_singleton()
 
@@ -56,16 +57,19 @@ def reset_singleton_between_tests() -> None:
 # Testes de defaults dos subestados
 # -----------------------------------------------------------------------------
 def test_app_meta_state_defaults() -> None:
-    """
-    Valida os valores padrão do AppMetaState.
+    """Valida os valores default do AppMetaState.
 
-    Este teste garante que defaults esperados sejam estáveis, pois eles são a
-    base para inicialização do aplicativo quando não há settings persistidos.
+    Este teste garante que os defaults essenciais usados no bootstrap sejam estáveis.
+    A versão é validada como string não vazia e com formato coerente para evitar
+    quebra a cada bump de release.
     """
     meta = state_module.AppMetaState()
 
     assert meta.name == "nicegui_app_template"
-    assert meta.version == "0.0.0"
+    assert isinstance(meta.version, str)
+    assert meta.version.strip() != ""
+    assert re.match(r"^\d+\.\d+\.\d+([a-zA-Z0-9\.\-]+)?$", meta.version) is not None
+
     assert meta.language == "pt-BR"
     assert meta.first_run is True
     assert meta.native_mode is True
@@ -73,11 +77,10 @@ def test_app_meta_state_defaults() -> None:
 
 
 def test_window_state_defaults() -> None:
-    """
-    Valida os valores padrão do WindowState.
+    """Valida os valores default do WindowState.
 
-    A configuração de janela impacta diretamente a UX e o modo nativo; manter
-    defaults corretos evita inconsistências na primeira execução.
+    A configuração de janela impacta diretamente a UX; manter defaults corretos
+    evita inconsistências na primeira execução.
     """
     window = state_module.WindowState()
 
@@ -92,8 +95,7 @@ def test_window_state_defaults() -> None:
 
 
 def test_ui_state_defaults() -> None:
-    """
-    Valida os valores padrão do UiState.
+    """Valida os valores default do UiState.
 
     Defaults de UI são usados como baseline quando não existem preferências
     persistidas, garantindo uma aparência inicial consistente.
@@ -107,8 +109,7 @@ def test_ui_state_defaults() -> None:
 
 
 def test_log_state_defaults() -> None:
-    """
-    Valida os valores padrão do LogState.
+    """Valida os valores default do LogState.
 
     Logging é crítico para diagnóstico; este teste garante que o caminho padrão
     e parâmetros essenciais estejam alinhados ao contrato do template.
@@ -117,6 +118,7 @@ def test_log_state_defaults() -> None:
 
     assert isinstance(log_state.path, Path)
     assert log_state.path == Path("logs/app.log")
+
     assert log_state.level == "INFO"
     assert log_state.console is True
     assert log_state.buffer_capacity == 500
@@ -125,8 +127,7 @@ def test_log_state_defaults() -> None:
 
 
 def test_behavior_state_defaults() -> None:
-    """
-    Valida os valores padrão do BehaviorState.
+    """Valida os valores default do BehaviorState.
 
     O estado de comportamento deve permanecer previsível para evitar efeitos
     colaterais inesperados em automações e rotinas do aplicativo.
@@ -140,11 +141,10 @@ def test_behavior_state_defaults() -> None:
 # Testes de composição do AppState
 # -----------------------------------------------------------------------------
 def test_app_state_defaults_and_composition() -> None:
-    """
-    Valida a composição do AppState e seus valores padrão.
+    """Valida a composição do AppState e seus valores default.
 
-    Este teste assegura que o estado raiz agregue corretamente todos os
-    subestados e que campos de runtime iniciem em valores seguros.
+    Este teste assegura que o estado raiz agregue corretamente todos os subestados
+    e que campos de runtime iniciem em valores seguros.
     """
     app_state = state_module.AppState()
 
@@ -161,8 +161,7 @@ def test_app_state_defaults_and_composition() -> None:
 
 
 def test_app_state_default_factories_create_distinct_instances() -> None:
-    """
-    Garante que os default factories não compartilham instâncias.
+    """Garante que os default factories não compartilham instâncias.
 
     Como os subestados são mutáveis por design (estado em runtime), qualquer
     compartilhamento acidental entre AppState diferentes seria um bug grave.
@@ -177,15 +176,28 @@ def test_app_state_default_factories_create_distinct_instances() -> None:
     assert a.behavior is not b.behavior
 
 
+def test_app_state_default_factories_are_independent_from_singleton() -> None:
+    """Garante que instâncias criadas manualmente não dependem do singleton.
+
+    Motivo:
+        - Evitar acoplamento implícito ao cache global
+        - Manter previsibilidade em cenários de testes e utilitários
+    """
+    singleton = state_module.get_app_state()
+    manual = state_module.AppState()
+
+    assert singleton is not manual
+    assert singleton.meta is not manual.meta
+
+
 # -----------------------------------------------------------------------------
 # Testes do singleton get_app_state
 # -----------------------------------------------------------------------------
 def test_get_app_state_returns_singleton_instance() -> None:
-    """
-    Verifica que get_app_state retorna sempre a mesma instância.
+    """Verifica que get_app_state retorna sempre a mesma instância.
 
-    Este é o contrato do singleton: chamadas repetidas devem compartilhar a
-    mesma referência, evitando estados divergentes no aplicativo.
+    Este é o contrato do singleton: chamadas repetidas devem compartilhar a mesma
+    referência, evitando estados divergentes no aplicativo.
     """
     first = state_module.get_app_state()
     second = state_module.get_app_state()
@@ -195,13 +207,12 @@ def test_get_app_state_returns_singleton_instance() -> None:
 
 
 def test_get_app_state_is_lazy_initialized() -> None:
-    """
-    Verifica que o singleton é inicializado sob demanda (lazy).
+    """Verifica que o singleton é inicializado sob demanda.
 
     A inicialização lazy é importante para:
     - reduzir custo de import
-    - permitir testes mais previsíveis
-    - facilitar bootstrap com logging/configurações em fases
+    - permitir bootstrap com logging/configurações em fases
+    - facilitar testes previsíveis e isolados
     """
     assert state_module._APP_STATE is None  # type: ignore[attr-defined]
 
@@ -211,8 +222,7 @@ def test_get_app_state_is_lazy_initialized() -> None:
 
 
 def test_singleton_reset_allows_new_instance() -> None:
-    """
-    Garante que é possível reinicializar o singleton em ambiente de teste.
+    """Garante que é possível reinicializar o singleton em ambiente de teste.
 
     Embora em produção o singleton não seja resetado, a capacidade de reset em
     testes é necessária para isolamento e reprodutibilidade.
@@ -229,8 +239,7 @@ def test_singleton_reset_allows_new_instance() -> None:
 # Testes de campos de runtime e restrições de slots
 # -----------------------------------------------------------------------------
 def test_app_state_runtime_fields_can_be_set() -> None:
-    """
-    Valida que campos de runtime do AppState são configuráveis.
+    """Valida que campos de runtime do AppState são configuráveis.
 
     Esses campos refletem resultados de carregamento/salvamento e devem ser
     mutáveis durante a execução, sem exigir reconstrução do estado.
@@ -248,14 +257,35 @@ def test_app_state_runtime_fields_can_be_set() -> None:
     assert app_state.last_error == "example error"
 
 
-def test_slots_prevent_dynamic_attributes() -> None:
-    """
-    Garante que dataclasses com slots impedem atributos dinâmicos.
+def test_slots_prevent_dynamic_attributes_on_app_state() -> None:
+    """Garante que AppState com slots impede atributos dinâmicos.
 
-    Esta garantia reduz erros de digitação e evita mutações estruturais
-    acidentais no estado, mantendo o modelo mais seguro e previsível.
+    Esta garantia reduz erros de digitação e evita mutações estruturais acidentais
+    no estado, mantendo o modelo mais seguro e previsível.
     """
     app_state = state_module.AppState()
 
     with pytest.raises(AttributeError):
         setattr(app_state, "unexpected_field", 123)
+
+
+@pytest.mark.parametrize(
+    "factory",
+    [
+        state_module.AppMetaState,
+        state_module.WindowState,
+        state_module.UiState,
+        state_module.LogState,
+        state_module.BehaviorState,
+    ],
+)
+def test_slots_prevent_dynamic_attributes_on_substates(factory) -> None:
+    """Garante que subestados com slots impedem atributos dinâmicos.
+
+    Args:
+        factory: Construtor do subestado a ser validado.
+    """
+    instance = factory()
+
+    with pytest.raises(AttributeError):
+        setattr(instance, "unexpected_field", 123)
