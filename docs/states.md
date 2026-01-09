@@ -1,132 +1,129 @@
-# Módulo `state`
+# State – NiceGUI App Template
 
-## Visão Geral
+Este documento descreve o módulo `state` do **NiceGUI App Template**, incluindo
+objetivos, princípios de design, estrutura interna e regras de evolução.
 
-O módulo `state` define o **estado central da aplicação** em tempo de execução.
-Ele representa a **fonte única de verdade (Single Source of Truth)** para todos os
-parâmetros carregados a partir de configurações persistentes ou alterados pela UI.
+O módulo de estado foi projetado para ser **simples, previsível e totalmente testável**,
+servindo como a **fonte única de verdade** da aplicação em tempo de execução.
 
-Este módulo é intencionalmente **puro**.
+---
+
+## 🎯 Objetivos do Módulo
+
+O módulo `state` resolve problemas comuns em aplicações desktop e SPA:
+
+- Centralizar dados em memória em uma estrutura única
+- Evitar acoplamento entre dados, UI e infraestrutura
+- Permitir inicialização previsível do aplicativo
+- Facilitar testes unitários sem mocks
+- Controlar evolução de campos persistentes
+
+---
+
+## 🧩 Princípios Fundamentais
+
+O módulo `state` é intencionalmente **puro**.
 
 Isso significa que ele:
 
-- Não realiza leitura ou escrita de arquivos
+- Não lê nem grava arquivos
 - Não conhece TOML, JSON ou qualquer formato de serialização
-- Não depende de UI (NiceGUI) nem de infraestrutura (logger)
+- Não depende de NiceGUI, logger ou sistema operacional
 - Não executa validações de entrada
 - Não contém lógica de negócio
 
-Seu papel é **representar dados**, não interpretá-los.
+Seu papel é **representar dados em memória**, não interpretá-los.
 
 ---
 
-## Objetivos do Design
+## 🗂 Estrutura Geral do Estado
 
-Os principais objetivos deste módulo são:
+O estado da aplicação é dividido em **subestados coesos**, cada um responsável
+por um domínio específico.
 
-1. **Desacoplamento**
-
-   - Separar completamente dados em memória de I/O e frameworks externos.
-
-2. **Previsibilidade**
-
-   - O estado deve ser simples, explícito e fácil de inspecionar em runtime.
-
-3. **Testabilidade**
-
-   - Qualquer teste pode instanciar o estado sem mocks ou dependências externas.
-
-4. **Evolução controlada**
-   - Novos campos podem ser adicionados sem quebrar contratos existentes.
+```mermaid
+flowchart TD
+    AppState --> AppMetaState
+    AppState --> WindowState
+    AppState --> UiState
+    AppState --> LogState
+    AppState --> BehaviorState
+```
 
 ---
 
-## Estrutura do Estado
+## 📦 Subestados
 
-O estado é dividido em **subestados coesos**, cada um responsável por um domínio
-específico da aplicação.
-
-### `AppMetaState`
+### AppMetaState
 
 Metadados globais do aplicativo.
 
 Responsabilidades típicas:
 
-- Nome e versão do aplicativo
+- Nome lógico do aplicativo
+- Versão
 - Idioma padrão
-- Flags de primeiro uso
-- Modo nativo (desktop)
+- Flag de primeiro uso
+- Indicação de modo desktop nativo
 - Porta de execução do NiceGUI
-
-Consumido principalmente no **bootstrap da aplicação**.
 
 ---
 
-### `WindowState`
+### WindowState
 
-Estado relacionado à janela da aplicação em modo desktop.
+Estado persistente relacionado à janela da aplicação em modo desktop.
 
 Campos comuns:
 
-- Posição (x, y)
+- Posição da janela (x, y)
 - Dimensões (width, height)
-- Flags de maximizado / fullscreen
+- Flags de maximizado e fullscreen
 - Monitor ativo
 - Chave de persistência para frontend (SPA)
 
-Este estado é usado tanto por argumentos de inicialização quanto por scripts
-de persistência via frontend.
-
 ---
 
-### `UiState`
+### UiState
 
 Preferências visuais da interface.
 
-Exemplos:
+Exemplos de campos:
 
 - Tema (dark / light)
 - Escala de fonte
-- Modo denso
+- Modo de densidade reduzida
 - Cor de destaque
-
-Este subestado é **consumido pela UI**, normalmente através de um ViewModel
-com binding do NiceGUI.
 
 ---
 
-### `LogState`
+### LogState
 
 Configuração de logging em alto nível.
 
 Características importantes:
 
-- `path` é do tipo `Path` (infraestrutura)
-- Níveis e rotação são representados como strings amigáveis
+- `path` é do tipo `Path`
+- Nível e rotação são representados como strings amigáveis
 - Não há parsing nem validação neste módulo
-
-O mapeamento de `LogState` para `LogConfig` ocorre em um **módulo de ponte**
-(`logger_settings.py`).
 
 ---
 
-### `BehaviorState`
+### BehaviorState
 
-Flags comportamentais do aplicativo.
+Flags comportamentais da aplicação.
 
 Usado para:
 
-- Habilitar ou desabilitar salvamento automático
-- Controlar fluxos futuros de automação
-
-Este subestado evita o uso de flags globais espalhadas pelo código.
+- Controlar salvamento automático
+- Centralizar decisões de fluxo
+- Evitar flags globais espalhadas pelo código
 
 ---
 
-## `AppState` — Estado Central
+## 🧠 AppState — Estado Central
 
 A classe `AppState` agrega todos os subestados e adiciona **campos de runtime**
-que não devem ser persistidos.
+que **não devem ser persistidos**.
 
 Campos de runtime incluem:
 
@@ -135,11 +132,9 @@ Campos de runtime incluem:
 - `last_save_ok`
 - `last_error`
 
-Esses campos existem para **diagnóstico e UI**, não para persistência.
-
 ---
 
-## Singleton Pragmatico
+## 🔁 Singleton de Estado
 
 O módulo expõe a função:
 
@@ -147,104 +142,78 @@ O módulo expõe a função:
 get_app_state() -> AppState
 ```
 
-Essa função implementa um singleton simples e controlado, adequado para aplicações desktop.
+Essa função implementa um singleton simples e explícito, adequado para aplicações desktop.
 
-Justificativa:
+```mermaid
+sequenceDiagram
+    participant App
+    participant StateModule
+    participant AppState
 
-Há apenas um processo
-
-Há apenas um estado global
-
-Evita injeção excessiva de dependências
-
-Mantém acesso explícito (não mágico)
-
-O singleton é lazy, ou seja, só é criado quando solicitado.
-
----
-
-Relação com Outros Módulos
-
-settings.py
-
-Lê settings.toml
-
-Faz parsing, validação leve e fallback
-
-Aplica valores no AppState
-
-Persiste novamente apenas campos configuráveis
-
-O state não conhece o settings.
+    App->>StateModule: get_app_state()
+    alt Estado inexistente
+        StateModule->>AppState: cria instância
+    end
+    StateModule-->>App: retorna AppState
+```
 
 ---
 
-ViewModels da UI
+## 🔗 Relação com Outros Módulos
 
-Convertem tipos de infraestrutura (Path) para tipos editáveis (str)
+### settings
 
-Realizam validação de entrada
-
-Aplicam alterações de volta ao AppState de forma explícita
-
-O state não conhece a UI.
-
----
-
-Logger
-
-O logger consome dados do LogState
-
-A conversão para LogConfig ocorre em um módulo intermediário
-
-O state não conhece handlers, níveis internos nem rotação
+- Lê `settings.toml`
+- Faz parsing e validação leve
+- Aplica valores no `AppState`
+- Persiste apenas campos configuráveis
 
 ---
 
-Regras de Evolução (Importantes)
+### UI / ViewModels
+
+- Convertem tipos de infraestrutura para tipos editáveis
+- Validam entrada
+- Aplicam alterações de volta ao `AppState`
+
+---
+
+### Logger
+
+- Consome dados do `LogState`
+- Converte para `LogConfig`
+- Gerencia handlers, níveis e rotação
+
+---
+
+## 📐 Regras de Evolução
 
 Ao adicionar um novo campo persistente:
 
-1. Adicionar o campo no subestado apropriado em state.py
-
-2. Ler o campo em settings.apply_settings_to_state
-
-3. Persistir o campo em settings.build_raw_from_state
-
-Esse é um contrato explícito, adotado para manter controle total sobre persistência e compatibilidade.
+1. Adicionar o campo no subestado apropriado em `state.py`
+2. Ler o campo em `settings.apply_settings_to_state`
+3. Persistir o campo em `settings.build_raw_from_state`
 
 ---
 
-O que não fazer neste módulo
+## 🚫 O que Não Pertence a Este Módulo
 
-Não adicionar lógica de UI
-
-Não adicionar parsing de arquivos
-
-Não adicionar validações complexas
-
-Não acessar variáveis de ambiente
-
-Não importar NiceGUI ou bibliotecas externas
-
-Se alguma dessas necessidades surgir, ela pertence a outro módulo.
+- Lógica de UI
+- Parsing de arquivos
+- Validações complexas
+- Variáveis de ambiente
+- Dependências externas
 
 ---
 
-Conclusão
+## ✅ Conclusão
 
-O módulo state é o coração do aplicativo.
+O módulo `state` é o núcleo de dados do aplicativo.
 
 Ele foi projetado para ser:
 
-Simples
-
-Explícito
-
-Desacoplado
-
-Testável
-
-Sustentável a longo prazo
-
-Qualquer complexidade adicional deve existir ao redor do estado, nunca dentro dele.
+- Simples
+- Explícito
+- Desacoplado
+- Totalmente testável
+- Sustentável a longo prazo
