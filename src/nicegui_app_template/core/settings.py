@@ -24,7 +24,6 @@ from __future__ import annotations
 
 import logging  # Logging é injetável e opcional; o módulo não deve depender do bootstrap do logger.
 import os  # Permite override de raiz do app via variável de ambiente para empacotamento/atalhos.
-import re  # Usado para parsing leve de tamanhos como "5 MB" para bytes.
 from pathlib import (
     Path,
 )  # Path é o tipo padrão para caminhos, evitando strings frágeis em múltiplos SOs.
@@ -38,7 +37,7 @@ from .state import (
     AppState,
     get_app_state,
 )  # O módulo aplica configurações diretamente no estado central.
-
+from .helpers import parse_size_to_bytes
 
 # -----------------------------------------------------------------------------
 # Compat TOML (Python 3.10+)
@@ -144,26 +143,6 @@ def _deep_get(mapping: Mapping[str, Any], path: str, default: Any) -> Any:
             return default
         cur = cur[part]
     return cur
-
-
-def _parse_size_to_bytes(value: str) -> Optional[int]:
-    """
-    Converte expressões como '5 MB' em bytes.
-
-    Motivo:
-    - RotatingFileHandler trabalha com maxBytes
-    - O TOML é mais amigável para humanos com unidades
-    """
-    raw = value.strip().upper()
-    match = re.match(r"^(\d+)\s*(B|KB|MB|GB)$", raw)
-    if not match:
-        return None
-
-    n = int(match.group(1))
-    unit = match.group(2)
-
-    multipliers = {"B": 1, "KB": 1024, "MB": 1024**2, "GB": 1024**3}
-    return n * multipliers[unit]
 
 
 def _ensure_parent_dir(file_path: Path) -> None:
@@ -378,7 +357,7 @@ def apply_settings_to_state(state: AppState, raw: Mapping[str, Any]) -> None:
     if state.log.level not in allowed_levels:
         state.log.level = "INFO"
 
-    if _parse_size_to_bytes(state.log.rotation) is None:
+    if parse_size_to_bytes(state.log.rotation) is None:
         state.log.rotation = "5 MB"
 
     if state.log.retention < 1:

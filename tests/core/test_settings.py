@@ -28,6 +28,7 @@ import pytest
 
 from nicegui_app_template.core import settings as settings_module
 from nicegui_app_template.core.state import AppState
+from nicegui_app_template.core.helpers import parse_size_to_bytes
 
 
 # -----------------------------------------------------------------------------
@@ -154,13 +155,13 @@ def test_deep_get_returns_default_when_missing() -> None:
 )
 def test_parse_size_to_bytes_valid(text: str, expected: int) -> None:
     """Garante que tamanhos válidos sejam convertidos corretamente para bytes."""
-    assert settings_module._parse_size_to_bytes(text) == expected
+    assert parse_size_to_bytes(text) == expected
 
 
 @pytest.mark.parametrize("text", ["", "10", "10 TB", "abc", "10  MB  X", "10MiB"])
 def test_parse_size_to_bytes_invalid_returns_none(text: str) -> None:
     """Garante que entradas inválidas retornem None, sem exceção."""
-    assert settings_module._parse_size_to_bytes(text) is None
+    assert parse_size_to_bytes(text) is None
 
 
 def test_to_toml_string_minimal_serialization_and_newline() -> None:
