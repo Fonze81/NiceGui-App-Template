@@ -15,12 +15,13 @@ from __future__ import annotations
 # - Validações são "leves" e orientadas a fallback para manter robustez do app
 #
 # Compatibilidade:
-# - Python 3.11+: usa tomllib (stdlib)
-# - Python 3.10: requer tomli como dependência opcional (somente para leitura)
+# - Python 3.13+
+# - Round-trip com tomlkit (preserva comentários, ordem e estilo do arquivo)
 #
 # Observação:
-# - Persistência é feita via serialização TOML mínima, sem dependências extras
-# - Se você quiser preservar comentários/ordem do TOML, considere tomlkit no futuro
+# - A persistência utiliza round-trip via tomlkit: o arquivo TOML existente é
+#   editado in-place, atualizando apenas chaves conhecidas e preservando
+#   comentários, ordem e estilo originais
 
 import logging  # Logging é injetável e opcional; o módulo não deve depender do bootstrap do logger.
 import os  # Permite override de raiz do app via variável de ambiente para empacotamento/atalhos.
@@ -33,45 +34,19 @@ from typing import (
     Optional,
 )  # Tipos explícitos facilitam manutenção e testes.
 
+import tomlkit  # tomlkit permite round-trip de TOML preservando comentários e formatação.
+from tomlkit.items import (
+    Table,
+)  # Table representa tabelas TOML internas (usado para criar/garantir hierarquia).
+from tomlkit.toml_document import (
+    TOMLDocument,
+)  # TOMLDocument é a AST mutável do arquivo TOML, preservando estilo.
+
+from .helpers import parse_size_to_bytes
 from .state import (
     AppState,
     get_app_state,
 )  # O módulo aplica configurações diretamente no estado central.
-from .helpers import parse_size_to_bytes
-
-# -----------------------------------------------------------------------------
-# Compat TOML (Python 3.10+)
-# -----------------------------------------------------------------------------
-# A leitura TOML precisa funcionar em 3.10 (tomli) e 3.11+ (tomllib).
-# A escrita TOML será feita por um serializador mínimo próprio (sem dependências).
-
-try:
-    import tomllib  # type: ignore  # Python 3.11+
-except Exception:  # pragma: no cover
-    tomllib = None  # type: ignore[assignment]
-
-
-def _loads_toml(text: str) -> dict[str, Any]:
-    """
-    Faz parse do TOML de forma compatível com Python 3.10+.
-
-    Estratégia:
-    - Preferir tomllib quando disponível (stdlib)
-    - Em 3.10, utilizar tomli (dependência opcional)
-    """
-    if tomllib is not None:
-        return tomllib.loads(text)  # type: ignore[no-any-return]
-
-    # Em Python 3.10, exigimos tomli apenas se o app realmente precisar ler TOML.
-    try:
-        import tomli  # type: ignore
-    except Exception as exc:  # pragma: no cover
-        raise RuntimeError(
-            "Python 3.10 requires 'tomli' to parse TOML. Install it with: pip install tomli"
-        ) from exc
-
-    return tomli.loads(text)  # type: ignore[no-any-return]
-
 
 # -----------------------------------------------------------------------------
 # Logger injetável com fallback silencioso
@@ -104,9 +79,9 @@ def _get_logger(logger: Optional[logging.Logger]) -> logging.Logger:
 # -----------------------------------------------------------------------------
 
 
-def _project_root_from_env() -> Path:
+def _resolve_app_root() -> Path:
     """
-    Resolve uma raiz de projeto simples.
+    Resolve a raiz do aplicativo.
 
     Motivo:
     - Em execução "normal", Path.cwd() é suficiente
@@ -126,7 +101,7 @@ def default_settings_path() -> Path:
     - Centralizar a convenção do projeto
     - Evitar strings repetidas espalhadas no código
     """
-    return _project_root_from_env() / "settings.toml"
+    return _resolve_app_root() / "settings.toml"
 
 
 def _deep_get(mapping: Mapping[str, Any], path: str, default: Any) -> Any:
@@ -137,12 +112,12 @@ def _deep_get(mapping: Mapping[str, Any], path: str, default: Any) -> Any:
     - Evitar blocos try/except em cada leitura
     - Manter comportamento consistente: se faltar, usa default
     """
-    cur: Any = mapping
+    cursor: Any = mapping
     for part in path.split("."):
-        if not isinstance(cur, Mapping) or part not in cur:
+        if not isinstance(cursor, Mapping) or part not in cursor:
             return default
-        cur = cur[part]
-    return cur
+        cursor = cursor[part]
+    return cursor
 
 
 def _ensure_parent_dir(file_path: Path) -> None:
@@ -164,90 +139,140 @@ def _atomic_write_text(file_path: Path, content: str) -> None:
     tmp_path.replace(file_path)
 
 
-# -----------------------------------------------------------------------------
-# Serialização TOML mínima
-# -----------------------------------------------------------------------------
-# Este serializador cobre apenas o necessário para o template:
-# - tabelas aninhadas [a] e [a.b]
-# - tipos escalares: str, int, float, bool
-# - Path é convertido para string
-#
-# Motivo:
-# - Evitar dependências extras para o template base
-# - Manter arquivo gerado legível e previsível
-#
-# Limitação:
-# - Não preserva comentários nem ordem original
-# - Não suporta arrays e tipos especiais (datas etc.)
-
-
-def _to_toml_string(data: Mapping[str, Any]) -> str:
+def _normalize_path_for_toml(path: Path) -> str:
     """
-    Serializa um dict para TOML com suporte mínimo.
+    Normaliza caminhos para persistência em TOML.
 
     Motivo:
-    - Persistir settings sem depender de bibliotecas externas
-    - Manter saída consistente para diffs e auditoria
+    - Evitar backslashes (Windows) no arquivo, reduzindo escaping e ruído em diffs
+    - Manter compatibilidade: caminhos com "/" funcionam no Windows e Unix
     """
+    return str(path).replace("\\", "/")
 
-    def fmt_value(v: Any) -> str:
-        # O TOML tem representações diferentes por tipo; aqui cobrimos o básico.
-        if isinstance(v, bool):
-            return "true" if v else "false"
-        if isinstance(v, (int, float)):
-            return str(v)
-        if isinstance(v, Path):
-            # Converter Path para string é o boundary correto da persistência.
-            return f'"{str(v).replace("\\\\", "/")}"'
-        if isinstance(v, str):
-            # Escape simples para manter string válida em TOML.
-            escaped = v.replace("\\", "\\\\").replace('"', '\\"')
-            return f'"{escaped}"'
-        raise TypeError(f"Unsupported TOML value type: {type(v)}")
 
-    lines: list[str] = []
+# -----------------------------------------------------------------------------
+# Round-trip TOML (tomlkit)
+# -----------------------------------------------------------------------------
+# tomlkit trabalha com uma AST mutável (TOMLDocument) e permite:
+# - manter comentários
+# - manter ordem e espaçamento
+# - atualizar apenas chaves específicas sem "regerar" o arquivo
 
-    # Separar escalares do nível raiz e tabelas ajuda a organizar o arquivo.
-    root_scalars: dict[str, Any] = {}
-    tables: dict[str, dict[str, Any]] = {}
 
-    for key, value in data.items():
-        if isinstance(value, Mapping):
-            tables[key] = dict(value)
-        else:
-            root_scalars[key] = value
+def _parse_toml_document(text: str) -> TOMLDocument:
+    """
+    Faz parse do TOML preservando comentários/ordem/estilo.
 
-    # Primeiro escrevemos escalares no root, se existirem.
-    for key, value in root_scalars.items():
-        lines.append(f"{key} = {fmt_value(value)}")
+    Motivo:
+    - O tomlkit retorna TOMLDocument que contém a estrutura + metadados de formatação
+    """
+    return tomlkit.parse(text)
 
-    def write_table(prefix: str, table_data: Mapping[str, Any]) -> None:
-        # Cada tabela pode conter escalares e tabelas aninhadas.
-        scalars: dict[str, Any] = {}
-        nested: dict[str, dict[str, Any]] = {}
 
-        for key, value in table_data.items():
-            if isinstance(value, Mapping):
-                nested[key] = dict(value)
-            else:
-                scalars[key] = value
+def _ensure_toml_table(root: TOMLDocument | Table, key: str) -> Table:
+    """
+    Garante que a chave exista como tabela TOML.
 
-        # Linha em branco antes de tabela melhora legibilidade.
-        lines.append("")
-        lines.append(f"[{prefix}]")
+    Motivo:
+    - Arquivo pode estar incompleto (primeiro uso) ou editado manualmente
+    - Criamos somente o necessário, preservando o restante do documento
+    """
+    current = root.get(key)
+    if isinstance(current, Table):
+        return current
 
-        for key, value in scalars.items():
-            lines.append(f"{key} = {fmt_value(value)}")
+    # Se existir com tipo errado, substituímos para evitar falha ao salvar e restaurar a hierarquia mínima.
+    table = tomlkit.table()
+    root[key] = table
+    return table
 
-        # Aninhamento é resolvido por prefixo "a.b".
-        for nested_key, nested_value in nested.items():
-            write_table(f"{prefix}.{nested_key}", nested_value)
 
-    for table_key, table_value in tables.items():
-        write_table(table_key, table_value)
+def _set_toml_value_by_path(
+    document: TOMLDocument, dotted_path: str, value: Any
+) -> None:
+    """
+    Define um valor em caminho pontilhado (ex.: 'app.log.level').
 
-    # Garantir newline final facilita ferramentas e diffs.
-    return "\n".join(lines).lstrip("\n").rstrip() + "\n"
+    Motivo:
+    - Centraliza escrita no documento e evita duplicação de lógica
+    - Garante criação incremental das tabelas sem apagar comentários fora do trecho editado
+    """
+    parts = dotted_path.split(".")
+    if not parts:
+        return
+
+    cursor: TOMLDocument | Table = document
+    for part in parts[:-1]:
+        cursor = _ensure_toml_table(cursor, part)
+
+    cursor[parts[-1]] = value
+
+
+def _apply_state_to_document(document: TOMLDocument, state: AppState) -> None:
+    """
+    Atualiza o TOMLDocument com os valores do estado.
+
+    Motivo:
+    - Preservar comentários e chaves não gerenciadas pelo template
+    - Atualizamos somente o conjunto de chaves conhecidas
+    """
+    _set_toml_value_by_path(document, "app.name", state.meta.name)
+    _set_toml_value_by_path(document, "app.version", state.meta.version)
+    _set_toml_value_by_path(document, "app.language", state.meta.language)
+    _set_toml_value_by_path(document, "app.first_run", state.meta.first_run)
+    _set_toml_value_by_path(document, "app.native_mode", state.meta.native_mode)
+    _set_toml_value_by_path(document, "app.port", state.meta.port)
+
+    _set_toml_value_by_path(document, "app.window.x", state.window.x)
+    _set_toml_value_by_path(document, "app.window.y", state.window.y)
+    _set_toml_value_by_path(document, "app.window.width", state.window.width)
+    _set_toml_value_by_path(document, "app.window.height", state.window.height)
+    _set_toml_value_by_path(document, "app.window.maximized", state.window.maximized)
+    _set_toml_value_by_path(document, "app.window.fullscreen", state.window.fullscreen)
+    _set_toml_value_by_path(document, "app.window.monitor", state.window.monitor)
+    _set_toml_value_by_path(
+        document, "app.window.storage_key", state.window.storage_key
+    )
+
+    _set_toml_value_by_path(document, "app.ui.theme", state.ui.theme)
+    _set_toml_value_by_path(document, "app.ui.font_scale", state.ui.font_scale)
+    _set_toml_value_by_path(document, "app.ui.dense_mode", state.ui.dense_mode)
+    _set_toml_value_by_path(document, "app.ui.accent_color", state.ui.accent_color)
+
+    # Persistimos como string para interoperabilidade e facilidade de edição.
+    _set_toml_value_by_path(
+        document,
+        "app.log.path",
+        _normalize_path_for_toml(state.log.path),
+    )
+    _set_toml_value_by_path(document, "app.log.level", state.log.level)
+    _set_toml_value_by_path(document, "app.log.console", state.log.console)
+    _set_toml_value_by_path(
+        document,
+        "app.log.buffer_capacity",
+        state.log.buffer_capacity,
+    )
+    _set_toml_value_by_path(document, "app.log.rotation", state.log.rotation)
+    _set_toml_value_by_path(document, "app.log.retention", state.log.retention)
+
+    _set_toml_value_by_path(
+        document,
+        "app.behavior.auto_save",
+        state.behavior.auto_save,
+    )
+
+
+def _build_minimal_document_from_state(state: AppState) -> TOMLDocument:
+    """
+    Cria um documento TOML mínimo baseado no estado.
+
+    Motivo:
+    - Permitir persistência no primeiro run mesmo sem arquivo existente
+    - Gerar estrutura mínima e previsível do template
+    """
+    document = tomlkit.document()
+    _apply_state_to_document(document, state)
+    return document
 
 
 # -----------------------------------------------------------------------------
@@ -375,65 +400,12 @@ def apply_settings_to_state(state: AppState, raw: Mapping[str, Any]) -> None:
 
 
 # -----------------------------------------------------------------------------
-# Construção: AppState -> dict TOML (somente persistente)
+# API pública do módulo
 # -----------------------------------------------------------------------------
-# A persistência deve conter apenas campos de configuração, não flags de runtime
-# como last_error/last_load_ok. Isso evita "vazar" estados efêmeros para disco.
-
-
-def build_raw_from_state(state: AppState) -> dict[str, Any]:
-    """
-    Constrói um dicionário serializável em TOML a partir do estado atual.
-
-    Motivo:
-    - Definir explicitamente o que é persistente
-    - Evitar acidentalmente salvar campos de runtime
-    """
-    return {
-        "app": {
-            "name": state.meta.name,
-            "version": state.meta.version,
-            "language": state.meta.language,
-            "first_run": state.meta.first_run,
-            "native_mode": state.meta.native_mode,
-            "port": state.meta.port,
-            "window": {
-                "x": state.window.x,
-                "y": state.window.y,
-                "width": state.window.width,
-                "height": state.window.height,
-                "maximized": state.window.maximized,
-                "fullscreen": state.window.fullscreen,
-                "monitor": state.window.monitor,
-                "storage_key": state.window.storage_key,
-            },
-            "ui": {
-                "theme": state.ui.theme,
-                "font_scale": state.ui.font_scale,
-                "dense_mode": state.ui.dense_mode,
-                "accent_color": state.ui.accent_color,
-            },
-            "log": {
-                # Persistimos como string para interoperabilidade e facilidade de edição.
-                "path": str(state.log.path).replace("\\", "/"),
-                "level": state.log.level,
-                "console": state.log.console,
-                "buffer_capacity": state.log.buffer_capacity,
-                "rotation": state.log.rotation,
-                "retention": state.log.retention,
-            },
-            "behavior": {
-                "auto_save": state.behavior.auto_save,
-            },
-        }
-    }
-
-
-# -----------------------------------------------------------------------------
-# API pública: load/save
-# -----------------------------------------------------------------------------
-# A API retorna bool para facilitar bootstrap do app sem exceções no fluxo normal.
-# Em caso de falha, a causa é registrada em state.last_error.
+# - load_settings(...)-> bool
+# - save_settings(...)-> bool
+#
+# Implementação: round-trip via tomlkit (parse → update de chaves conhecidas → dumps).
 
 
 def load_settings(
@@ -469,8 +441,8 @@ def load_settings(
         return False
 
     try:
-        raw = _loads_toml(path.read_text(encoding="utf-8"))
-        apply_settings_to_state(st, raw)
+        document = _parse_toml_document(path.read_text(encoding="utf-8"))
+        apply_settings_to_state(st, document)
         st.last_load_ok = True
         log.info("Settings loaded successfully")
         return True
@@ -512,10 +484,19 @@ def save_settings(
     st.last_save_ok = False
 
     try:
-        # Persistimos apenas campos configuráveis, deixando runtime fora do arquivo.
-        raw = build_raw_from_state(st)
-        content = _to_toml_string(raw)
+        if path.exists():
+            # Parse do arquivo existente preserva comentários e estilo.
+            document = _parse_toml_document(path.read_text(encoding="utf-8"))
+        else:
+            # Primeiro save: não há comentários a preservar; criamos estrutura mínima.
+            document = _build_minimal_document_from_state(st)
+
+        # Atualiza somente chaves conhecidas, preservando chaves extras e comentários.
+        _apply_state_to_document(document, st)
+
+        content = tomlkit.dumps(document)
         _atomic_write_text(path, content)
+
         st.last_save_ok = True
         log.info("Settings saved successfully")
         return True
