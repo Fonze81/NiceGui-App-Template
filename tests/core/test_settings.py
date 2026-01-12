@@ -40,8 +40,8 @@ from nicegui_app_template.core.state import AppState
 
 @dataclass
 class _MetaState:
-    name: str = "MyApp"
-    version: str = "0.0.0"
+    name: str = "nicegui_app_template"
+    version: str = "0.1.0a2"
     language: str = "pt-BR"
     first_run: bool = True
     native_mode: bool = True
@@ -135,19 +135,70 @@ def test_logger() -> logging.Logger:
 # -----------------------------------------------------------------------------
 
 
-def test_fake_state_defaults_match_real_state_for_critical_fields() -> None:
+def test_fake_state_defaults_match_real_state_for_all_fields() -> None:
     """
-    Garante que defaults críticos do FakeAppState não derivem do AppState real.
+    Garante que TODOS os defaults do FakeAppState reflitam o AppState real.
 
     Motivo:
     - Evita regressões silenciosas quando defaults do estado real evoluem
     - Mantém testes representativos do comportamento real do aplicativo
+    - Força alinhamento completo do estado fake com o estado real
     """
     real = AppState()
     fake = _FakeAppState()
 
+    # ---------------------------------------------------------------------
+    # Meta
+    # ---------------------------------------------------------------------
+    assert fake.meta.name == real.meta.name
+    assert fake.meta.version == real.meta.version
+    assert fake.meta.language == real.meta.language
+    assert fake.meta.first_run == real.meta.first_run
+    assert fake.meta.native_mode == real.meta.native_mode
+    assert fake.meta.port == real.meta.port
+
+    # ---------------------------------------------------------------------
+    # Window
+    # ---------------------------------------------------------------------
+    assert fake.window.x == real.window.x
+    assert fake.window.y == real.window.y
+    assert fake.window.width == real.window.width
+    assert fake.window.height == real.window.height
+    assert fake.window.maximized == real.window.maximized
+    assert fake.window.fullscreen == real.window.fullscreen
+    assert fake.window.monitor == real.window.monitor
+    assert fake.window.storage_key == real.window.storage_key
+
+    # ---------------------------------------------------------------------
+    # UI
+    # ---------------------------------------------------------------------
+    assert fake.ui.theme == real.ui.theme
+    assert fake.ui.font_scale == real.ui.font_scale
+    assert fake.ui.dense_mode == real.ui.dense_mode
+    assert fake.ui.accent_color == real.ui.accent_color
+
+    # ---------------------------------------------------------------------
+    # Log
+    # ---------------------------------------------------------------------
+    assert fake.log.path == real.log.path
+    assert fake.log.level == real.log.level
+    assert fake.log.console == real.log.console
+    assert fake.log.buffer_capacity == real.log.buffer_capacity
+    assert fake.log.rotation == real.log.rotation
     assert fake.log.retention == real.log.retention
+
+    # ---------------------------------------------------------------------
+    # Behavior
+    # ---------------------------------------------------------------------
     assert fake.behavior.auto_save == real.behavior.auto_save
+
+    # ---------------------------------------------------------------------
+    # Runtime fields (não persistentes) — defaults esperados
+    # ---------------------------------------------------------------------
+    assert fake.settings_file_path == real.settings_file_path
+    assert fake.last_error == real.last_error
+    assert fake.last_load_ok == real.last_load_ok
+    assert fake.last_save_ok == real.last_save_ok
 
 
 # -----------------------------------------------------------------------------
@@ -246,7 +297,7 @@ def test_parse_toml_document_parses_basic_document() -> None:
         """
         # comment
         [app]
-        name = "MyApp"
+        name = "nicegui_app_template"
         [app.log]
         path = "logs/app.log"
         """
@@ -257,7 +308,7 @@ def test_parse_toml_document_parses_basic_document() -> None:
     app_table = document.get("app")
     assert isinstance(app_table, Table)
 
-    assert app_table.get("name") == "MyApp"
+    assert app_table.get("name") == "nicegui_app_template"
 
     log_table = app_table.get("log")
     assert isinstance(log_table, Table)
@@ -601,7 +652,7 @@ def test_save_settings_preserves_comments_and_unknown_keys(
 
 [app]
 name = "Original"
-version = "0.0.0"
+version = "0.1.0a2"
 # comment inside app
 unknown_key = "keep_me"
 
@@ -648,7 +699,7 @@ def test_save_settings_normalizes_log_path_to_forward_slashes(
         """
 [app]
 name = "X"
-version = "0.0.0"
+version = "0.1.0a2"
 
 [app.log]
 path = "logs/app.log"
