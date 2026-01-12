@@ -14,7 +14,7 @@ from __future__ import annotations
 # Decisão de teste:
 # - Usamos um estado fake (_FakeAppState) para evitar dependência do AppState real.
 # - Isso mantém o teste focado no contrato do módulo de settings e reduz acoplamento.
-# - Quando a função espera AppState, usamos cast apenas nos testes.
+# - Um teste específico garante que defaults críticos do fake não derivem do estado real.
 # -----------------------------------------------------------------------------
 
 import logging
@@ -34,7 +34,7 @@ from nicegui_app_template.core.state import AppState
 # Estados mínimos para testes
 # -----------------------------------------------------------------------------
 # Estes dataclasses reproduzem apenas os campos que o módulo de settings acessa.
-# A intenção é validar parsing, defaults e fallback sem depender do AppState real.
+# Os defaults DEVEM espelhar os defaults reais do AppState para evitar drift.
 # -----------------------------------------------------------------------------
 
 
@@ -75,12 +75,12 @@ class _LogState:
     console: bool = True
     buffer_capacity: int = 500
     rotation: str = "5 MB"
-    retention: int = 7
+    retention: int = 3  # alinhado com AppState real
 
 
 @dataclass
 class _BehaviorState:
-    auto_save: bool = False
+    auto_save: bool = True  # alinhado com AppState real
 
 
 class _FakeAppState:
@@ -89,7 +89,7 @@ class _FakeAppState:
 
     Motivo:
     - Os testes não devem depender do estado real do app para validar o módulo de settings
-    - Mantém foco em comportamento (I/O, parsing, defaults e fallback)
+    - Defaults devem espelhar o AppState real para evitar regressões silenciosas
     """
 
     def __init__(self) -> None:
@@ -128,6 +128,26 @@ def test_logger() -> logging.Logger:
     logger = logging.getLogger("test_settings_logger")
     logger.setLevel(logging.DEBUG)
     return logger
+
+
+# -----------------------------------------------------------------------------
+# Teste anti-drift: defaults do fake devem refletir AppState real
+# -----------------------------------------------------------------------------
+
+
+def test_fake_state_defaults_match_real_state_for_critical_fields() -> None:
+    """
+    Garante que defaults críticos do FakeAppState não derivem do AppState real.
+
+    Motivo:
+    - Evita regressões silenciosas quando defaults do estado real evoluem
+    - Mantém testes representativos do comportamento real do aplicativo
+    """
+    real = AppState()
+    fake = _FakeAppState()
+
+    assert fake.log.retention == real.log.retention
+    assert fake.behavior.auto_save == real.behavior.auto_save
 
 
 # -----------------------------------------------------------------------------
