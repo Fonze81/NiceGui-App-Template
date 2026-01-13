@@ -451,7 +451,7 @@ def test_enable_file_logging_is_defensive_when_called_before_bootstrap(
         assert _count_handlers(root_logger, RotatingFileHandler) == 1
         content = _read_log_with_backups(log_file, backup_count=2)
 
-        assert "Enabling file logging" in content
+        assert f'File logging enabled: "{log_file.resolve()}"' in content
         assert "File handler attached" in content
     finally:
         try:
@@ -693,7 +693,7 @@ def test_internal_debug_messages_are_written_when_level_is_debug(logger_ctx) -> 
 
     assert "Logger bootstrap started" in content
     assert "Logger bootstrap completed" in content
-    assert "Enabling file logging" in content
+    assert f'File logging enabled: "{log_file.resolve()}"' in content
     assert "File handler attached" in content
     assert "Logger shutdown started" in content
     assert "Logger shutdown completed" in content
