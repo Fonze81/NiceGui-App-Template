@@ -23,9 +23,8 @@ from typing import Any
 
 import pytest
 
-from nicegui_app_template.core.logger import LogConfig
+from nicegui_app_template.core.logger import DEFAULT_LOG_LEVEL, LogConfig
 from nicegui_app_template.core.logger_resolver import (
-    DEFAULT_LOG_LEVEL,
     DEFAULT_ROTATE_MAX_BYTES,
     resolve_log_config_from_state,
 )

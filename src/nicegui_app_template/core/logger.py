@@ -33,7 +33,7 @@ import sys
 from dataclasses import dataclass
 from logging.handlers import MemoryHandler, RotatingFileHandler
 from pathlib import Path
-from typing import Optional
+from typing import Final, Optional
 
 # -----------------------------------------------------------------------------
 # Estado interno do módulo - controle do nome do logger raiz
@@ -64,6 +64,44 @@ def _set_root_logger_name(name: str) -> None:
 
 
 # -----------------------------------------------------------------------------
+# Helpers internos - resolução de nível (texto -> logging int)
+# -----------------------------------------------------------------------------
+# Esta conversão é um detalhe específico do domínio de logging e tende a ser
+# reutilizada por adaptadores (ex.: logger_resolver) sem exigir que o logger
+# conheça AppState, settings ou UI.
+
+DEFAULT_LOG_LEVEL: Final[int] = logging.INFO
+
+_LOG_LEVEL_MAP: Final[dict[str, int]] = {
+    "CRITICAL": logging.CRITICAL,
+    "ERROR": logging.ERROR,
+    "WARNING": logging.WARNING,
+    "WARN": logging.WARNING,  # Alias comum aceito para compatibilidade.
+    "INFO": logging.INFO,
+    "DEBUG": logging.DEBUG,
+    "NOTSET": logging.NOTSET,
+}
+
+
+def resolve_log_level(level: str, *, default: int = DEFAULT_LOG_LEVEL) -> int:
+    """Resolve um nível textual para a constante do módulo logging.
+
+    Args:
+        level: Nível em formato humano (ex.: "INFO", "debug", " warn ").
+        default: Valor técnico utilizado como fallback se o texto for inválido.
+
+    Returns:
+        Constante do módulo logging correspondente ao nível informado.
+
+    Notes:
+        - Esta função é pura e determinística.
+        - Não lança exceções; sempre retorna um int válido para o logging.
+    """
+    normalized = (level or "").upper().strip()
+    return _LOG_LEVEL_MAP.get(normalized, default)
+
+
+# -----------------------------------------------------------------------------
 # Configuração - parâmetros de logging
 # -----------------------------------------------------------------------------
 
@@ -73,8 +111,11 @@ class LogConfig:
     """Configuração do sistema de logging do template.
 
     Esta classe centraliza os parâmetros técnicos do logger já normalizados.
-    Conversões, validações e parsing de dados externos devem ocorrer fora
-    do logger (por exemplo, no módulo de settings).
+
+    Observação:
+        - O template mantém a conversão State/Settings -> LogConfig fora do logger
+          (ex.: logger_resolver). Entretanto, este módulo pode expor helpers
+          específicos do domínio de logging (por exemplo, resolução de nível).
 
     Motivos:
         - Centralizar parâmetros de logging.

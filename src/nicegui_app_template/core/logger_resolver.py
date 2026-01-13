@@ -25,35 +25,18 @@ from __future__ import annotations
 # - É determinístico e facilmente testável
 # -----------------------------------------------------------------------------
 
-import logging
 from typing import Final
 
-from .logger import LogConfig
 from .helpers import parse_size_to_bytes
+from .logger import DEFAULT_LOG_LEVEL, LogConfig, resolve_log_level
 from .state import AppState
 
-
 # -----------------------------------------------------------------------------
-# Constantes e mapas de conversão
+# Constantes de conversão
 # -----------------------------------------------------------------------------
-
-# Nível de log padrão utilizado quando o valor no estado é inválido ou desconhecido.
-DEFAULT_LOG_LEVEL: Final[int] = logging.INFO
 
 # Tamanho padrão de rotação (em bytes) utilizado como fallback seguro.
 DEFAULT_ROTATE_MAX_BYTES: Final[int] = 5 * 1024 * 1024
-
-# Mapeamento explícito entre níveis textuais e constantes do módulo logging.
-# Este mapa evita uso de getattr/reflection e mantém comportamento previsível.
-_LOG_LEVEL_MAP: Final[dict[str, int]] = {
-    "CRITICAL": logging.CRITICAL,
-    "ERROR": logging.ERROR,
-    "WARNING": logging.WARNING,
-    "WARN": logging.WARNING,  # Alias comum aceito para compatibilidade.
-    "INFO": logging.INFO,
-    "DEBUG": logging.DEBUG,
-    "NOTSET": logging.NOTSET,
-}
 
 
 # -----------------------------------------------------------------------------
@@ -84,21 +67,14 @@ def resolve_log_config_from_state(state: AppState) -> LogConfig:
 
     Returns:
         Uma instância de LogConfig pronta para ser aplicada ao logger.
-
-    Design rationale:
-        - Mantém o AppState limpo e independente de detalhes de infraestrutura
-        - Centraliza toda a lógica de conversão em um único ponto
-        - Facilita testes, manutenção e futuras mudanças no backend de logging
     """
 
     # -------------------------------------------------------------------------
     # Level: str -> int
     # -------------------------------------------------------------------------
-    # Normalizamos a string para evitar problemas com case ou espaços acidentais.
-    level_str = state.log.level.upper().strip()
-
-    # O uso de um mapa explícito evita reflexão dinâmica e torna o fallback claro.
-    level: int = _LOG_LEVEL_MAP.get(level_str, DEFAULT_LOG_LEVEL)
+    # A resolução do nível textual é um detalhe específico do domínio de logging,
+    # por isso o helper vive no módulo logger e é chamado aqui pelo boundary.
+    level: int = resolve_log_level(state.log.level, default=DEFAULT_LOG_LEVEL)
 
     # -------------------------------------------------------------------------
     # Rotation: str -> bytes
@@ -112,8 +88,6 @@ def resolve_log_config_from_state(state: AppState) -> LogConfig:
     # -------------------------------------------------------------------------
     # Construção final do LogConfig
     # -------------------------------------------------------------------------
-    # A partir deste ponto, todos os valores são técnicos e compatíveis
-    # com o módulo logging e seus handlers.
     return LogConfig(
         name="nicegui_app_template",
         level=level,
