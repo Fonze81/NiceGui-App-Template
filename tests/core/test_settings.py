@@ -579,8 +579,11 @@ auto_save = true
     assert fake_state.log.console is True
 
     assert fake_state.behavior.auto_save is True
+    expected_path = str(settings_path.resolve())
     assert any(
-        "Settings loaded successfully" in rec.getMessage() for rec in caplog.records
+        ("Settings parsed and applied to AppState" in rec.getMessage())
+        and (expected_path in rec.getMessage())
+        for rec in caplog.records
     )
 
 
