@@ -1,4 +1,4 @@
-# State – NiceGUI App Template
+# Módulo `state` – NiceGUI App Template
 
 Este documento descreve o módulo `state` do **NiceGUI App Template**, incluindo
 objetivos, princípios de design, estrutura interna e regras de evolução.
@@ -20,7 +20,7 @@ O módulo `state` resolve problemas comuns em aplicações desktop e SPA:
 
 ---
 
-## 🧩 Princípios Fundamentais
+## 🧠 Princípios Fundamentais
 
 O módulo `state` é intencionalmente **puro**.
 
@@ -36,7 +36,7 @@ Seu papel é **representar dados em memória**, não interpretá-los.
 
 ---
 
-## 🗂 Estrutura Geral do Estado
+## 🏗️ Estrutura Geral do Estado
 
 O estado da aplicação é dividido em **subestados coesos**, cada um responsável
 por um domínio específico.
@@ -52,7 +52,7 @@ flowchart TD
 
 ---
 
-## 📦 Subestados
+## 🧩 Subestados
 
 ### AppMetaState
 

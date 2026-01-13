@@ -1,4 +1,4 @@
-# Logger – NiceGUI App Template
+# Módulo `logger` – NiceGUI App Template
 
 Este documento descreve o módulo de logging do **NiceGUI App Template**, incluindo
 objetivos, arquitetura, lifecycle, fluxo de execução, contratos explícitos e boas práticas de uso.

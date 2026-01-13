@@ -12,7 +12,7 @@ A estrutura foi pensada para:
 
 ---
 
-## Visão geral
+## 📌 Visão geral
 
 ```text
 NiceGui-App-Template/

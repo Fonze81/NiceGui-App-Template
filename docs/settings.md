@@ -16,7 +16,7 @@ Seu papel é exclusivamente **I/O, conversão e fallback**.
 
 ---
 
-## 🧭 Responsabilidades Principais
+## 🎯 Responsabilidades Principais
 
 O módulo `settings` é responsável por:
 
@@ -29,7 +29,7 @@ O módulo `settings` é responsável por:
 
 ---
 
-## 🏗️ Princípios de Design
+## 🧠 Princípios de Design
 
 ### Boundary explícito
 
@@ -73,7 +73,7 @@ O módulo **não regenera** o arquivo se ele já existir.
 
 ---
 
-## 📦 Dependências
+## ⚙️ Dependências
 
 - **Python**: 3.13+
 - **TOML**: `tomlkit`
@@ -82,7 +82,7 @@ A dependência de `tomlkit` é **intencional** e **confinada ao módulo `setting
 
 ---
 
-## 📁 Localização do Arquivo `settings.toml`
+## 💾 Localização do Arquivo `settings.toml`
 
 Por padrão, o arquivo é procurado em:
 
