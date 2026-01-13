@@ -444,7 +444,7 @@ def load_settings(
         document = _parse_toml_document(path.read_text(encoding="utf-8"))
         apply_settings_to_state(st, document)
         st.last_load_ok = True
-        log.info("Settings loaded successfully")
+        log.info('Settings parsed and applied to AppState: path="%s"', str(path))
         return True
     except Exception as exc:
         st.last_error = f"Failed to load settings: {exc}"

@@ -410,8 +410,6 @@ class LoggerBootstrapper:
         if not getattr(logger, self._BOOTSTRAPPED_ATTR, False):
             self.bootstrap()
 
-        logger.debug("Enabling file logging")
-
         if isinstance(getattr(logger, self._FILE_HANDLER_ATTR, None), logging.Handler):
             logger.debug("File logging already enabled - skipping")
             return logger
@@ -444,7 +442,7 @@ class LoggerBootstrapper:
         setattr(logger, self._FILE_HANDLER_ATTR, file_handler)
 
         logger.debug("File handler attached")
-        logger.info("File logging enabled: %s", str(target_path))
+        logger.debug('File logging enabled: "%s"', str(target_path.resolve()))
         return logger
 
     def shutdown(self) -> None:
