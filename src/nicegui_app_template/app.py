@@ -3,109 +3,87 @@
 from __future__ import annotations
 
 # -----------------------------------------------------------------------------
-# Módulo de entrada do aplicativo
+# Ponto de Entrada Lógico da Aplicação
 # -----------------------------------------------------------------------------
-# Este módulo é o ponto de entrada da aplicação.
-#
-# Responsabilidades deste arquivo:
-# - Orquestrar o ciclo de vida do logger (bootstrap → update → enable → shutdown)
-# - Carregar configurações persistentes (settings.toml)
-# - Resolver configurações humanas do estado em valores técnicos
-# - Garantir que falhas não interrompam o bootstrap da aplicação
-#
-# Decisões arquiteturais:
-# - Nenhuma lógica de negócio deve residir aqui
-# - Nenhuma configuração é parseada manualmente
-# - O estado é tratado como fonte de verdade em runtime
-# - Conversões técnicas são delegadas a resolvers explícitos
+# Este módulo coordena:
+# - Bootstrap de infraestrutura (logger, settings, estado)
+# - Execução do servidor NiceGUI
 # -----------------------------------------------------------------------------
+
+import asyncio
+
+from nicegui import ui
 
 from .core.logger import create_bootstrapper, get_logger
 from .core.logger_resolver import resolve_log_config_from_state
 from .core.settings import load_settings
-from .core.state import get_app_state
+from .core.state import AppState, get_app_state
 
 
-def main() -> None:
+def bootstrap_infrastructure() -> AppState:
     """
-    Inicializa e orquestra o bootstrap da aplicação.
+    Inicializa a infraestrutura essencial da aplicação.
 
-    Esta função executa a sequência completa de inicialização do aplicativo,
-    garantindo que:
-    - O logger seja iniciado em modo buffered
-    - As configurações persistentes sejam carregadas no estado
-    - A configuração técnica do logger seja resolvida a partir do estado
-    - O logging em arquivo seja habilitado de forma segura
-    - Recursos do logger sejam finalizados corretamente ao final
+    Responsabilidades:
+    - Inicializar o logger em modo buffer (early logging)
+    - Obter o estado central da aplicação
+    - Carregar configurações persistentes (settings.toml)
+    - Reconfigurar o logger com base no estado carregado
+    - Ativar o logging em arquivo
 
-    A função não retorna valores e não lança exceções intencionalmente,
-    permitindo que o aplicativo siga com defaults mesmo em cenários de falha.
+    Returns:
+        Instância de AppState inicializada com dados de settings ou defaults.
     """
-
-    # -------------------------------------------------------------------------
-    # Bootstrap inicial do logger (modo buffer)
-    # -------------------------------------------------------------------------
-    # O logger é inicializado antes de qualquer outra operação para capturar
-    # mensagens iniciais, mesmo antes do caminho de arquivo estar resolvido.
     logger_bootstrapper = create_bootstrapper()
     logger_bootstrapper.bootstrap()
-    log = get_logger()
 
-    # -------------------------------------------------------------------------
-    # Inicialização do estado da aplicação
-    # -------------------------------------------------------------------------
-    # O estado central é obtido como fonte única de verdade em runtime.
+    log = get_logger()
+    log.debug("Application infrastructure bootstrap started")
+
     state = get_app_state()
 
-    # -------------------------------------------------------------------------
-    # Carregamento das configurações persistentes
-    # -------------------------------------------------------------------------
-    # Passar explicitamente state e logger evita uso de logger nulo e melhora
-    # rastreabilidade em caso de falha no carregamento.
     load_ok = load_settings(state=state, logger=log)
-
     if load_ok:
         log.info("Settings loaded successfully")
     else:
-        # O load_settings já registra o erro detalhado; aqui apenas explicitamos
-        # que o aplicativo seguirá com valores default.
-        log.warning("Settings load failed; defaults are being used")
+        log.warning("Settings load failed; using default values")
 
-    # -------------------------------------------------------------------------
-    # Resolução da configuração técnica do logger
-    # -------------------------------------------------------------------------
-    # Converte valores humanos do estado (ex.: 'INFO', '5 MB') em valores técnicos
-    # exigidos pelo sistema de logging do Python.
     log_config = resolve_log_config_from_state(state)
     logger_bootstrapper.update_config(log_config)
 
     try:
-        # ---------------------------------------------------------------------
-        # Ativação do logging em arquivo
-        # ---------------------------------------------------------------------
-        # A partir deste ponto, o logger tenta persistir mensagens em disco.
-        log.debug("Application starting (buffered)")
+        logger_bootstrapper.enable_file_logging()
+        log.info("File logging is active")
+    except Exception:
+        log.exception("Failed to enable file logging")
 
-        try:
-            logger_bootstrapper.enable_file_logging()
-            log.info("File logging is active")
-        except Exception:
-            # Falhas aqui costumam estar relacionadas a permissões ou paths
-            # inválidos. A aplicação não deve quebrar por isso.
-            log.exception("Failed to enable file logging")
-
-        # ---------------------------------------------------------------------
-        # Bootstrap real da aplicação (UI, rotas, serviços, etc.)
-        # ---------------------------------------------------------------------
-        # Este é o ponto onde a inicialização do NiceGUI ou outros subsistemas
-        # deve ocorrer. Mantido fora deste exemplo por clareza.
-    finally:
-        # ---------------------------------------------------------------------
-        # Finalização controlada do logger
-        # ---------------------------------------------------------------------
-        # Garante flush de buffers e liberação correta de handlers.
-        logger_bootstrapper.shutdown()
+    return state
 
 
-if __name__ == "__main__":
-    main()
+def main(*, reload: bool) -> None:
+    """
+    Ponto de entrada principal da aplicação.
+
+    Args:
+        reload: Controla o auto-reload do NiceGUI (recomendado apenas em DEV).
+
+    Observação:
+        Capturamos CancelledError/KeyboardInterrupt para reduzir ruído no
+        encerramento (Ctrl+C) em Windows + Uvicorn.
+    """
+    state = bootstrap_infrastructure()
+
+    log = get_logger()
+    log.info("Application starting")
+
+    try:
+        ui.run(
+            title=state.meta.name,
+            port=state.meta.port,
+            native=state.meta.native_mode,
+            reload=reload,
+        )
+    except (asyncio.CancelledError, KeyboardInterrupt):
+        # CancelledError pode acontecer durante shutdown do Uvicorn; é esperado.
+        log.info("Application shutdown requested")
+        return

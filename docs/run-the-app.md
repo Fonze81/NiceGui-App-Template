@@ -19,7 +19,8 @@ Este projeto adota oficialmente as seguintes premissas:
 - O projeto **sempre roda dentro de uma venv**
 - O layout do projeto é **src/**
 - O pacote **deve ser instalado em modo editável**
-- O aplicativo é executado **como módulo**, nunca como arquivo
+- O aplicativo é executado **oficialmente como módulo**
+  (execuções como script são restritas ao modo de desenvolvimento)
 - O **debug já está configurado no repositório**
 
 ---
@@ -154,3 +155,103 @@ pytest
 ```
 
 ---
+
+## 🔄 Modos de Execução do Aplicativo
+
+O NiceGUI App Template suporta **dois modos de execução**, cada um com um objetivo específico.
+
+Essa separação é **intencional** e existe para lidar corretamente com as
+limitações do Windows, do `multiprocessing` e do auto-reload do NiceGUI.
+
+---
+
+### ▶️ Execução Oficial (modo estável)
+
+```powershell
+python -m nicegui_app_template
+```
+
+**Características:**
+
+- Executa o aplicativo como **pacote**
+- Utiliza o entrypoint oficial (`__main__.py`)
+- Auto-reload **desativado**
+- Modo mais estável e previsível
+
+**Quando usar:**
+
+- Uso normal do template
+- Testes manuais
+- Execução empacotada (PyInstaller)
+- Ambientes onde estabilidade é prioridade
+
+---
+
+### 🛠️ Execução em Modo Desenvolvimento (com reload)
+
+```powershell
+python dev_run.py
+```
+
+> ℹ️ Nota
+> Este modo existe exclusivamente para permitir auto-reload no Windows
+> e **não substitui o fluxo oficial de execução do template**.
+
+**Características:**
+
+- Executa o aplicativo como **script**
+- Auto-reload **ativado**
+- Reinicia automaticamente ao alterar arquivos
+- Entrada compatível com `multiprocessing` no Windows
+
+**Quando usar:**
+
+- Desenvolvimento ativo
+- Ajustes frequentes em UI e layout
+- Iterações rápidas
+
+---
+
+## ❓ Por que existem dois modos?
+
+O auto-reload do NiceGUI utiliza **multiprocessing**.
+
+No Windows, esse mecanismo funciona no modo **spawn**, o que significa que
+o processo filho **reexecuta o ponto de entrada** da aplicação.
+
+Quando o aplicativo é iniciado como módulo:
+
+```powershell
+python -m nicegui_app_template
+```
+
+com `reload=True`, o processo filho **nem sempre consegue reencontrar**
+o ponto onde `ui.run()` é chamado, resultando no erro:
+
+```
+RuntimeError:
+You must call ui.run() to start the server.
+```
+
+Por esse motivo, o template separa explicitamente:
+
+- **Execução oficial** → sem reload (máxima estabilidade)
+- **Execução de desenvolvimento** → com reload, via script dedicado
+
+Essa abordagem evita erros intermitentes e mantém o comportamento previsível.
+
+Esse comportamento é uma limitação conhecida da combinação atual entre
+Windows, multiprocessing e auto-reload do NiceGUI, e **não representa
+um erro de arquitetura do template**.
+
+---
+
+## 📌 Resumo rápido
+
+```text
+Execução oficial (sem reload):
+    python -m nicegui_app_template
+
+Execução de desenvolvimento (com reload):
+    python dev_run.py
+```
