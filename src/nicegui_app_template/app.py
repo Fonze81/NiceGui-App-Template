@@ -25,20 +25,18 @@ from nicegui import app, ui
 from .core.logger import LoggerBootstrapper, create_bootstrapper, get_logger
 from .core.logger_resolver import resolve_log_config_from_state
 from .core.settings import load_settings
-from .core.state import get_app_state
+from .core.state import AppState, get_app_state
 
 # -----------------------------------------------------------------------------
 # Estado mínimo de runtime (privado ao módulo)
 # -----------------------------------------------------------------------------
 # Motivo:
-# - Precisamos de um guard para evitar reexecução do bootstrap no mesmo processo.
-# - Precisamos manter referência ao bootstrapper para shutdown limpo.
+# - A presença de um bootstrapper ativo indica que o bootstrap já ocorreu
+#   no processo atual e também fornece referência para um shutdown limpo.
 # - Isso não pertence ao AppState (estado "puro") e não deve ser persistido.
 # -----------------------------------------------------------------------------
 
 _bootstrapper: LoggerBootstrapper | None = None
-_started: bool = False
-_hooks_registered: bool = False
 
 # -----------------------------------------------------------------------------
 # Bootstrap de infraestrutura
@@ -49,7 +47,7 @@ _hooks_registered: bool = False
 # -----------------------------------------------------------------------------
 
 
-def bootstrap_infrastructure() -> None:
+def bootstrap_infrastructure() -> AppState:
     """
     Inicializa a infraestrutura essencial da aplicação.
 
@@ -62,6 +60,9 @@ def bootstrap_infrastructure() -> None:
 
     Observação:
         Esta função não inicia o servidor; ela apenas prepara infraestrutura.
+
+    Returns:
+        Instância de AppState inicializada com dados de settings ou defaults.
     """
     global _bootstrapper
 
@@ -93,12 +94,14 @@ def bootstrap_infrastructure() -> None:
             state.log.level,
             state.log.console,
         )
-
     except Exception:
         # Falhas aqui não devem impedir o app de subir; buffer/console ainda ajudam.
         log.exception("Failed to enable file logging")
 
-    _bootstrapper = logger_bootstrapper  # Mantém referência para shutdown previsível.
+    _bootstrapper = (
+        logger_bootstrapper  # Presença indica bootstrap concluído no processo atual.
+    )
+    return state
 
 
 # -----------------------------------------------------------------------------
@@ -118,24 +121,19 @@ def _on_startup() -> None:
         Centraliza a inicialização em um único ponto do lifecycle e impede
         reexecuções no mesmo processo.
     """
-    global _started
+    global _bootstrapper
 
-    if _started:
+    if _bootstrapper is not None:
         log = get_logger()
         log.info("Startup bootstrap skipped (already started): pid=%s", os.getpid())
         return
 
-    bootstrap_infrastructure()
+    state = bootstrap_infrastructure()
 
     log = get_logger()
-
-    state = get_app_state()
-
     log.info(
         "[LIFECYCLE] Application starting: pid=%s port=%s", os.getpid(), state.meta.port
     )
-
-    _started = True
 
 
 def _on_shutdown() -> None:
@@ -146,7 +144,7 @@ def _on_shutdown() -> None:
         Encerra handlers gerenciados pelo bootstrapper para reduzir risco de
         locks de arquivo e garantir flush final de logs.
     """
-    global _bootstrapper, _started
+    global _bootstrapper
 
     log = get_logger()
     log.info("[LIFECYCLE] Application shutdown requested: pid=%s", os.getpid())
@@ -162,7 +160,6 @@ def _on_shutdown() -> None:
         log.exception("Logger shutdown failed")
     finally:
         _bootstrapper = None
-        _started = False
 
 
 # -----------------------------------------------------------------------------
@@ -185,16 +182,12 @@ def main(*, reload: bool) -> None:
         Capturamos CancelledError/KeyboardInterrupt para reduzir ruído no
         encerramento (Ctrl+C) em Windows + Uvicorn.
     """
-    global _hooks_registered
-
-    if not _hooks_registered:
-        # Guard garante que main() não registre os mesmos hooks mais de uma vez no mesmo processo.
-        app.on_startup(_on_startup)
-        app.on_shutdown(_on_shutdown)
-        _hooks_registered = True
+    # Registro explícito e simples; main() deve ser chamado uma única vez por processo.
+    app.on_startup(_on_startup)
+    app.on_shutdown(_on_shutdown)
 
     try:
-        # Usamos o estado atual para parâmetros de ui.run; defaults já existem mesmo sem settings.
+        # Defaults já existem mesmo sem settings; o bootstrap ocorrerá no startup do servidor.
         state = get_app_state()
 
         ui.run(
