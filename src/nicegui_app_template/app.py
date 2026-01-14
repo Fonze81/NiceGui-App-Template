@@ -209,6 +209,17 @@ def main(*, reload: bool) -> None:
         # Bootstrap antes de ui.run() para garantir state atualizado.
         state = bootstrap_infrastructure()
 
+        # Aviso explícito sobre efeitos colaterais do reload no Windows.
+        if reload:
+            log = get_logger()
+            log.warning(
+                "NiceGUI reload=True may start multiple Python processes (watcher/server). "
+                "This can cause duplicated log messages and repeated bootstrap side effects. "
+                "Use reload only for development and keep production runs with reload=False. "
+                "pid=%s",
+                os.getpid(),
+            )
+
         ui.run(
             title=state.meta.name,
             port=state.meta.port,
