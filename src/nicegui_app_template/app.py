@@ -5,16 +5,24 @@ from __future__ import annotations
 # -----------------------------------------------------------------------------
 # Ponto de Entrada Lógico da Aplicação
 # -----------------------------------------------------------------------------
-# Este módulo coordena:
-# - Bootstrap de infraestrutura (logger, settings, estado)
-# - Registro de hooks de lifecycle do servidor
-# - Execução do servidor NiceGUI
+# Este módulo orquestra a inicialização e o encerramento da aplicação.
 #
-# Decisões importantes:
-# - O bootstrap de infraestrutura é disparado no startup do servidor para evitar
-#   efeitos colaterais durante import e reduzir inicializações redundantes em
-#   cenários onde múltiplos processos possam existir.
-# - O shutdown do logger é explícito para minimizar locks de arquivo no Windows.
+# Responsabilidades:
+# - Executar o bootstrap de infraestrutura (logger, settings e estado)
+# - Registrar hooks de lifecycle do servidor (startup/shutdown)
+# - Iniciar o servidor NiceGUI
+#
+# Decisões arquiteturais importantes:
+# - O bootstrap de infraestrutura ocorre explicitamente ANTES de ui.run().
+#   Isso é necessário porque parâmetros como porta e modo nativo são consumidos
+#   no momento da chamada de ui.run() e dependem de valores carregados via settings.
+#
+# - app.on_startup não é utilizado para bootstrap, pois é executado após a
+#   criação/partida do servidor e não é um ponto confiável para influenciar
+#   parâmetros de inicialização.
+#
+# - O shutdown do logger é explícito e controlado para garantir flush correto
+#   e minimizar riscos de locks de arquivo no Windows.
 # -----------------------------------------------------------------------------
 
 import asyncio
@@ -31,9 +39,15 @@ from .core.state import AppState, get_app_state
 # Estado mínimo de runtime (privado ao módulo)
 # -----------------------------------------------------------------------------
 # Motivo:
-# - A presença de um bootstrapper ativo indica que o bootstrap já ocorreu
-#   no processo atual e também fornece referência para um shutdown limpo.
-# - Isso não pertence ao AppState (estado "puro") e não deve ser persistido.
+# - Mantém a referência ao bootstrapper ativo no processo atual.
+# - Indica que o bootstrap de infraestrutura já foi executado neste processo.
+# - Permite um shutdown explícito e seguro dos handlers de logging.
+#
+# Decisão arquitetural:
+# - Este estado é estritamente de runtime.
+# - Não pertence ao AppState (que deve permanecer puro e independente de
+#   infraestrutura).
+# - Não deve ser persistido nem exposto fora deste módulo.
 # -----------------------------------------------------------------------------
 
 _bootstrapper: LoggerBootstrapper | None = None
@@ -41,15 +55,10 @@ _bootstrapper: LoggerBootstrapper | None = None
 # -----------------------------------------------------------------------------
 # Bootstrap de infraestrutura
 # -----------------------------------------------------------------------------
-# Motivo:
-# - Centralizar a sequência de inicialização (logger buffer -> settings -> logger update -> file).
-# - Facilitar testes e manter o fluxo previsível.
-# -----------------------------------------------------------------------------
 
 
 def bootstrap_infrastructure() -> AppState:
-    """
-    Inicializa a infraestrutura essencial da aplicação.
+    """Inicializa a infraestrutura essencial da aplicação.
 
     Responsabilidades:
         - Inicializar o logger em modo buffer (early logging)
@@ -59,12 +68,18 @@ def bootstrap_infrastructure() -> AppState:
         - Ativar o logging em arquivo
 
     Observação:
-        Esta função não inicia o servidor; ela apenas prepara infraestrutura.
+        Esta função não inicia o servidor. Seu papel é preparar a infraestrutura
+        necessária antes da chamada de ui.run().
 
     Returns:
-        Instância de AppState inicializada com dados de settings ou defaults.
+        Instância de AppState inicializada com dados provenientes do
+        settings.toml ou com valores padrão.
     """
     global _bootstrapper
+
+    # Evita bootstrap repetido no mesmo processo, preservando idempotência.
+    if _bootstrapper is not None:
+        return get_app_state()
 
     logger_bootstrapper = create_bootstrapper()
     logger_bootstrapper.bootstrap()  # Captura logs antes do caminho do arquivo existir.
@@ -74,20 +89,19 @@ def bootstrap_infrastructure() -> AppState:
 
     state = get_app_state()  # Singleton explícito do estado da aplicação.
 
-    load_ok = load_settings(
-        state=state, logger=log
-    )  # Parsing + fallback aplicado no state.
+    # load_settings aplica parsing + fallback no próprio state.
+    load_ok = load_settings(state=state, logger=log)
     log.debug("Configuration phase completed: settings_load_ok=%s", load_ok)
     if not load_ok:
         log.warning("Settings load failed; using default values")
 
-    log_config = resolve_log_config_from_state(
-        state
-    )  # Converte LogState para config técnica do logger.
+    # Resolve LogConfig técnico com base no estado.
+    log_config = resolve_log_config_from_state(state)
     logger_bootstrapper.update_config(log_config)
 
     try:
-        logger_bootstrapper.enable_file_logging()  # Anexa file handler e descarrega buffer.
+        # Ativa escrita em arquivo e flush do buffer.
+        logger_bootstrapper.enable_file_logging()
         log.info(
             'Logging ready: file="%s" level="%s" console=%s',
             str(state.log.path.resolve()),
@@ -95,12 +109,11 @@ def bootstrap_infrastructure() -> AppState:
             state.log.console,
         )
     except Exception:
-        # Falhas aqui não devem impedir o app de subir; buffer/console ainda ajudam.
+        # Fail-safe: o app continua com console/buffer se algo falhar.
         log.exception("Failed to enable file logging")
 
-    _bootstrapper = (
-        logger_bootstrapper  # Presença indica bootstrap concluído no processo atual.
-    )
+    # Presença indica bootstrap concluído no processo atual.
+    _bootstrapper = logger_bootstrapper
     return state
 
 
@@ -108,41 +121,41 @@ def bootstrap_infrastructure() -> AppState:
 # Hooks de lifecycle do servidor
 # -----------------------------------------------------------------------------
 # Motivo:
-# - Executar o bootstrap no momento correto de início do servidor.
-# - Garantir shutdown limpo para liberar handlers e reduzir locks de arquivo.
+# - Registrar pontos explícitos de observabilidade durante o ciclo de vida
+#   do servidor (startup e shutdown).
+# - Garantir um shutdown limpo para liberar handlers de logging e reduzir
+#   riscos de locks de arquivo no Windows.
+#
+# Observação:
+# - O bootstrap de infraestrutura não ocorre nesses hooks.
+# - Ele é executado antes de ui.run(), pois parâmetros críticos do servidor
+#   dependem de valores previamente carregados no estado.
 # -----------------------------------------------------------------------------
 
 
 def _on_startup() -> None:
+    """Executa ações de observabilidade no startup do servidor.
+
+    Observação:
+        O bootstrap não ocorre aqui porque ui.run() já consumiu parâmetros
+        de inicialização (port/native). Este hook existe para rastreabilidade.
     """
-    Hook de startup do servidor.
-
-    Motivo:
-        Centraliza a inicialização em um único ponto do lifecycle e impede
-        reexecuções no mesmo processo.
-    """
-    global _bootstrapper
-
-    if _bootstrapper is not None:
-        log = get_logger()
-        log.info("Startup bootstrap skipped (already started): pid=%s", os.getpid())
-        return
-
-    state = bootstrap_infrastructure()
-
     log = get_logger()
+    state = get_app_state()
     log.info(
-        "[LIFECYCLE] Application starting: pid=%s port=%s", os.getpid(), state.meta.port
+        "[LIFECYCLE] Server startup: pid=%s port=%s native=%s",
+        os.getpid(),
+        state.meta.port,
+        state.meta.native_mode,
     )
 
 
 def _on_shutdown() -> None:
-    """
-    Hook de shutdown do servidor.
+    """Executa o shutdown controlado da infraestrutura no encerramento do servidor.
 
     Motivo:
-        Encerra handlers gerenciados pelo bootstrapper para reduzir risco de
-        locks de arquivo e garantir flush final de logs.
+        Encerrar handlers do logger de forma explícita reduz riscos de locks
+        de arquivo no Windows e garante flush final.
     """
     global _bootstrapper
 
@@ -166,14 +179,17 @@ def _on_shutdown() -> None:
 # Entry point
 # -----------------------------------------------------------------------------
 # Motivo:
-# - Registrar hooks de forma explícita e local ao entry point, evitando efeitos colaterais no import.
-# - Executar o servidor e reduzir ruído de encerramento no Windows (Ctrl+C + asyncio).
+# - Centralizar o ponto único de entrada da aplicação por processo.
+# - Registrar hooks de lifecycle de forma explícita, evitando efeitos colaterais
+#   durante o import de módulos.
+# - Executar o servidor NiceGUI após o bootstrap da infraestrutura.
+# - Tratar sinais de encerramento (Ctrl+C / CancelledError), reduzindo ruído
+#   de exceções no Windows.
 # -----------------------------------------------------------------------------
 
 
 def main(*, reload: bool) -> None:
-    """
-    Ponto de entrada principal da aplicação.
+    """Ponto de entrada principal da aplicação.
 
     Args:
         reload: Controla o auto-reload do NiceGUI (recomendado apenas em DEV).
@@ -182,13 +198,16 @@ def main(*, reload: bool) -> None:
         Capturamos CancelledError/KeyboardInterrupt para reduzir ruído no
         encerramento (Ctrl+C) em Windows + Uvicorn.
     """
-    # Registro explícito e simples; main() deve ser chamado uma única vez por processo.
+    # Registro explícito do lifecycle da aplicação.
+    # main() deve ser chamado uma única vez por processo.
+    # Os hooks são registrados antes de ui.run() para garantir um shutdown limpo
+    # e previsível do servidor e do logger.
     app.on_startup(_on_startup)
     app.on_shutdown(_on_shutdown)
 
     try:
-        # Defaults já existem mesmo sem settings; o bootstrap ocorrerá no startup do servidor.
-        state = get_app_state()
+        # Bootstrap antes de ui.run() para garantir state atualizado.
+        state = bootstrap_infrastructure()
 
         ui.run(
             title=state.meta.name,
