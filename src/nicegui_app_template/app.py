@@ -34,6 +34,7 @@ from .core.logger import LoggerBootstrapper, create_bootstrapper, get_logger
 from .core.logger_resolver import resolve_log_config_from_state
 from .core.settings import load_settings
 from .core.state import AppState, get_app_state
+from .ui.index import register_routes
 
 # -----------------------------------------------------------------------------
 # Estado mínimo de runtime (privado ao módulo)
@@ -219,6 +220,10 @@ def main(*, reload: bool) -> None:
                 "pid=%s",
                 os.getpid(),
             )
+
+        # O roteamento SPA é inicializado durante ui.run();
+        # por isso as rotas devem ser registradas previamente.
+        register_routes()
 
         ui.run(
             title=state.meta.name,
