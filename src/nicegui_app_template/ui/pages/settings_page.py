@@ -23,7 +23,30 @@ from nicegui import ui
 from ...core.logger import get_logger
 from ...core.settings import save_settings
 from ...core.state import get_app_state
+from ...core.helpers import parse_size_to_bytes
 from ..viewmodels.settings_vm import SettingsViewModel
+
+
+MIN_LOG_ROTATION_BYTES = 1 * 1024**2  # 1 MB
+MAX_LOG_ROTATION_BYTES = 5 * 1024**3  # 5 GB
+
+
+def validate_rotation(value: str | None) -> str | None:
+    if not value:
+        return "Informe um valor (ex.: 5 MB)"
+
+    try:
+        size_bytes = parse_size_to_bytes(value)
+    except ValueError:
+        return "Formato inválido. Use, por exemplo: 5 MB, 10 KB ou 1 GB"
+
+    if size_bytes < MIN_LOG_ROTATION_BYTES:
+        return "Valor mínimo permitido: 1 MB"
+
+    if size_bytes > MAX_LOG_ROTATION_BYTES:
+        return "Valor máximo permitido: 5 GB"
+
+    return None
 
 
 def render_settings_page() -> None:
@@ -265,11 +288,18 @@ def render_settings_page() -> None:
                     ),
                 ).props("type=number min=50 max=5000")
 
-                ui.input(
-                    "Rotação (ex.: 5 MB)",
+                with ui.input(
+                    label="Rotação por tamanho (ex.: 5 MB)",
                     value=form.log_rotation,
-                    on_change=lambda e: setattr(form, "log_rotation", str(e.value)),
-                )
+                    validation=validate_rotation,
+                    on_change=lambda e: setattr(
+                        form, "log_rotation", str(e.value).strip()
+                    ),
+                ):
+                    ui.tooltip(
+                        "Define o tamanho máximo do arquivo de log. "
+                        "Ao atingir esse limite, um novo arquivo é criado automaticamente."
+                    )
 
                 with ui.input(
                     "Retenção (backups)",
