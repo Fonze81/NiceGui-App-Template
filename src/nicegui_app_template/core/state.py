@@ -55,7 +55,7 @@ class AppMetaState:
     """
 
     name: str = "nicegui_app_template"
-    version: str = "0.1.0a2"
+    version: str = "0.1.1a0"
     language: str = "pt-BR"
     first_run: bool = True
     native_mode: bool = True

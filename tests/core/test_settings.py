@@ -41,7 +41,7 @@ from nicegui_app_template.core.state import AppState
 @dataclass
 class _MetaState:
     name: str = "nicegui_app_template"
-    version: str = "0.1.0a2"
+    version: str = "0.1.1a0"
     language: str = "pt-BR"
     first_run: bool = True
     native_mode: bool = True
@@ -655,7 +655,7 @@ def test_save_settings_preserves_comments_and_unknown_keys(
 
 [app]
 name = "Original"
-version = "0.1.0a2"
+version = "0.1.1a0"
 # comment inside app
 unknown_key = "keep_me"
 
@@ -702,7 +702,7 @@ def test_save_settings_normalizes_log_path_to_forward_slashes(
         """
 [app]
 name = "X"
-version = "0.1.0a2"
+version = "0.1.1a0"
 
 [app.log]
 path = "logs/app.log"

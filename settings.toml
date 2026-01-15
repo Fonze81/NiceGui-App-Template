@@ -21,7 +21,7 @@
 # -----------------------------------------------------------------------------
 [app]
 name = "nicegui_app_template"
-version = "0.1.0a2"
+version = "0.1.1a0"
 language = "pt-BR"
 first_run = true
 native_mode = true
