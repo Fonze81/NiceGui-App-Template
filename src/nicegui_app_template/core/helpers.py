@@ -27,7 +27,6 @@ from __future__ import annotations
 # -----------------------------------------------------------------------------
 
 import re
-from typing import Optional
 
 
 # -----------------------------------------------------------------------------
@@ -35,7 +34,7 @@ from typing import Optional
 # -----------------------------------------------------------------------------
 
 
-def parse_size_to_bytes(value: str) -> Optional[int]:
+def parse_size_to_bytes(value: str) -> int:
     """
     Converte uma expressão textual de tamanho em bytes.
 
@@ -77,7 +76,7 @@ def parse_size_to_bytes(value: str) -> Optional[int]:
     # - evita unidades ambíguas ou não suportadas
     match = re.match(r"^(\d+)\s*(B|KB|MB|GB)$", raw)
     if not match:
-        return None
+        raise ValueError("Invalid size format")
 
     size = int(match.group(1))
     unit = match.group(2)
