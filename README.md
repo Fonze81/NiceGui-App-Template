@@ -57,6 +57,48 @@ Essas decisões não são opcionais e fazem parte do padrão do template.
 
 ---
 
+## 🧭 Decisões Arquiteturais
+
+Este template adota decisões arquiteturais **intencionais**, focadas em previsibilidade,
+testabilidade e manutenção de longo prazo para aplicações **desktop Windows-first com NiceGUI**.
+
+### Estado (`state`)
+
+O estado da aplicação é **puro** (apenas dados em memória, sem I/O, validações ou dependências
+externas) e exposto como **singleton controlado**, adequado para aplicações desktop
+single-instance.
+➡️ [`state.md`](docs/state.md)
+
+**Trade-off:** validações delegadas às boundaries ou UI; não indicado para cenários
+multi-user ou multi-tenant.
+
+---
+
+### Configurações (`settings`)
+
+As configurações persistentes são tratadas como **boundary explícito** entre o estado e o
+filesystem (TOML), com round-trip preservando comentários e chaves desconhecidas.
+➡️ [`settings.md`](docs/settings.md)
+
+**Trade-off:** mapping manual em troca de controle e segurança.
+
+---
+
+### Logging (`logger`)
+
+O logging possui **lifecycle explícito e idempotente**, com suporte a early logging em memória
+e shutdown defensivo.
+➡️ [`logger.md`](docs/logger.md)
+
+**Trade-off:** maior complexidade inicial para garantir integridade dos logs.
+
+---
+
+> Estas decisões fazem parte do **contrato arquitetural do template** e não devem ser
+> alteradas sem considerar seus impactos.
+
+---
+
 ## 🧰 Ambiente de Desenvolvimento
 
 As instruções completas sobre:
